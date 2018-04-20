@@ -13,10 +13,10 @@
 
 struct GlyphInfo
 {
-    uint32 originI;
-    uint32 originJ;
+    Vec2Int atlasCoords;
     uint32 width;
     uint32 height;
+    
     int offsetX;
     int offsetY;
     int advanceX;
@@ -41,8 +41,8 @@ bool LoadFontFace(ThreadContext* thread,
 
 int GetTextWidth(const FontFace* face, const char* text);
 void RenderText(const FontFace* face, const char* text,
-    int x, int y, Vec4 color,
+    Vec2Int pos, Vec4 color,
     GameBackbuffer* backbuffer);
 void RenderText(const FontFace* face, const char* text,
-    int x, int y, Vec2 anchor, Vec4 color,
+    Vec2Int pos, Vec2 anchor, Vec4 color,
     GameBackbuffer* backbuffer);

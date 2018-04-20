@@ -539,6 +539,23 @@ internal void Win32ProcessMessages(HWND hWnd, GameInput* gameInput)
             }
 		} break;
 
+        case WM_LBUTTONDOWN: {
+            gameInput->mouseButtons[0].isDown = true;
+            gameInput->mouseButtons[0].transitions = 1;
+        } break;
+        case WM_LBUTTONUP: {
+            gameInput->mouseButtons[0].isDown = false;
+            gameInput->mouseButtons[0].transitions = 1;
+        } break;
+        case WM_RBUTTONDOWN: {
+            gameInput->mouseButtons[1].isDown = true;
+            gameInput->mouseButtons[1].transitions = 1;
+        } break;
+        case WM_RBUTTONUP: {
+            gameInput->mouseButtons[1].isDown = false;
+            gameInput->mouseButtons[1].transitions = 1;
+        } break;
+
 		default: {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -549,6 +566,11 @@ internal void Win32ProcessMessages(HWND hWnd, GameInput* gameInput)
 
 internal void Win32ClearInput(GameInput* input, GameInput* inputPrev)
 {
+    for (int i = 0; i < 5; i++) {
+        input->mouseButtons[i].isDown = inputPrev->mouseButtons[i].isDown;
+        input->mouseButtons[i].transitions = 0;
+    }
+
     for (int i = 0; i < KM_KEY_LAST; i++) {
         input->keyboard[i].isDown = inputPrev->keyboard[i].isDown;
         input->keyboard[i].transitions = 0;
@@ -724,14 +746,23 @@ int CALLBACK WinMain(
 		POINT mousePos;
 		GetCursorPos(&mousePos);
 		ScreenToClient(hWnd, &mousePos);
-		newInput->mouseX = mousePos.x;
-		newInput->mouseY = backbuffer_.height - mousePos.y;
+        newInput->mousePos.x = mousePos.x;
+		newInput->mousePos.y = backbuffer_.height - mousePos.y;
 		newInput->mouseWheel = 0;
-		newInput->mouseButtons[0].isDown = (int32)GetKeyState(VK_LBUTTON);
+        if (mousePos.x < 0 || mousePos.x > backbuffer_.width
+        || mousePos.y < 0 || mousePos.y > backbuffer_.height) {
+            for (int i = 0; i < 5; i++) {
+                int transitions = newInput->mouseButtons[i].isDown ? 1 : 0;
+                newInput->mouseButtons[i].isDown = false;
+                newInput->mouseButtons[i].transitions = transitions;
+            }
+        }
+
+		/*newInput->mouseButtons[0].isDown = (int32)GetKeyState(VK_LBUTTON);
 		newInput->mouseButtons[1].isDown = (int32)GetKeyState(VK_RBUTTON);
 		newInput->mouseButtons[2].isDown = (int32)GetKeyState(VK_MBUTTON);
 		newInput->mouseButtons[3].isDown = (int32)GetKeyState(VK_XBUTTON1);
-		newInput->mouseButtons[4].isDown = (int32)GetKeyState(VK_XBUTTON2);
+		newInput->mouseButtons[4].isDown = (int32)GetKeyState(VK_XBUTTON2);*/
 
 		ThreadContext thread = {};
         GameBackbuffer gameBackbuffer = {};
@@ -750,8 +781,8 @@ int CALLBACK WinMain(
         int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
         timerLast = timerEnd;
         cyclesLast = cyclesEnd;
-        DEBUG_PRINT("%fs/f, %ff/s, %dMc/f\n",
-            elapsed, fps, mCyclesPerFrame);
+        /*DEBUG_PRINT("%fs/f, %ff/s, %dMc/f\n",
+            elapsed, fps, mCyclesPerFrame);*/
 
 		if (gameCode.gameUpdateAndRender) {
 			gameCode.gameUpdateAndRender(&thread, &gameMemory,

@@ -78,7 +78,8 @@ struct GameControllerInput
 struct GameInput
 {
 	GameButtonState mouseButtons[5];
-	int mouseX, mouseY, mouseWheel;
+    Vec2Int mousePos;
+	int mouseWheel;
 
     GameButtonState keyboard[KM_KEY_LAST];
     char keyboardString[MAX_KEYS_PER_FRAME];

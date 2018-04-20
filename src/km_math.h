@@ -6,6 +6,22 @@
 
 #define PI_F 3.14159265f
 
+inline int MinInt(int a, int b) {
+    return a < b ? a : b;
+}
+inline int MaxInt(int a, int b) {
+    return a > b ? a : b;
+}
+// TODO: naive round implementation
+inline int RoundFloat32(float32 a) {
+    if (a < 0.0) {
+        return (int)(a - 0.5);
+    }
+    else {
+        return (int)(a + 0.5);
+    }
+}
+
 // ========== MATH TYPES ==========
 
 union Vec2
@@ -20,6 +36,17 @@ union Vec2
 		float32 x, y;
 	};
 	float32 e[2];
+};
+
+union Vec2Int
+{
+    const static Vec2Int zero;
+
+    struct
+    {
+        int x, y;
+    };
+    int e[2];
 };
 
 union Vec3
@@ -202,6 +229,89 @@ inline float32 Mag(Vec2 v)
 inline Vec2 Normalize(Vec2 v)
 {
 	return v / Mag(v);
+}
+
+// ------------------ Vec2Int -------------------
+const Vec2Int Vec2Int::zero = {
+    0, 0
+};
+
+inline Vec2Int operator-(Vec2Int v)
+{
+	Vec2Int result;
+	result.x = -v.x;
+	result.y = -v.y;
+	return result;
+}
+
+inline Vec2Int operator+(Vec2Int v1, Vec2Int v2)
+{
+	Vec2Int result;
+	result.x = v1.x + v2.x;
+	result.y = v1.y + v2.y;
+	return result;
+}
+inline Vec2Int& operator+=(Vec2Int& v1, Vec2Int v2)
+{
+	v1 = v1 + v2;
+	return v1;
+}
+
+inline Vec2Int operator-(Vec2Int v1, Vec2Int v2)
+{
+	Vec2Int result;
+	result.x = v1.x - v2.x;
+	result.y = v1.y - v2.y;
+	return result;
+}
+inline Vec2Int& operator-=(Vec2Int& v1, Vec2Int v2)
+{
+	v1 = v1 - v2;
+	return v1;
+}
+
+inline Vec2Int operator*(int s, Vec2Int v)
+{
+	Vec2Int result;
+	result.x = s * v.x;
+	result.y = s * v.y;
+	return result;
+}
+inline Vec2Int operator*(Vec2Int v, int s)
+{
+	return s * v;
+}
+inline Vec2Int& operator*=(Vec2Int& v, int s)
+{
+	v = s * v;
+	return v;
+}
+
+inline Vec2Int operator/(Vec2Int v, int s)
+{
+	Vec2Int result;
+	result.x = v.x / s;
+	result.y = v.y / s;
+	return result;
+}
+inline Vec2Int& operator/=(Vec2Int& v, int s)
+{
+	v = v / s;
+	return v;
+}
+
+inline bool operator==(const Vec2Int& v1, const Vec2Int& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y;
+}
+
+inline int MagSq(Vec2Int v)
+{
+	return v.x*v.x + v.y*v.y;
+}
+inline int Mag(Vec2Int v)
+{
+	return (int)sqrtf((float32)v.x*v.x + v.y*v.y);
 }
 
 // -------------------- Vec3 --------------------

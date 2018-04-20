@@ -121,8 +121,8 @@ bool LoadFontFace(ThreadContext* thread,
             }
         }
         // Save UV coordinate data.
-        fontFace->glyphInfo[ch].originI = originI;
-        fontFace->glyphInfo[ch].originJ = originJ;
+        Vec2Int atlasCoords = { (int)originI, (int)originJ };
+        fontFace->glyphInfo[ch].atlasCoords = atlasCoords;
 
         originI += glyphWidth + pad;
     }
@@ -147,17 +147,19 @@ int GetTextWidth(const FontFace* face, const char* text)
 }
 
 void RenderText(const FontFace* face, const char* text,
-    int x, int y, Vec4 color,
+    Vec2Int pos, Vec4 color,
     GameBackbuffer* backbuffer)
 {
     int i = 0, j = 0;
     for (const char* p = text; *p != 0; p++) {
         GlyphInfo glyphInfo = face->glyphInfo[*p];
-        RenderGrayscaleBitmapSection(backbuffer,
-            x + i + glyphInfo.offsetX,
-            y + j + glyphInfo.offsetY,
+        Vec2Int glyphPos = {
+            pos.x + i + glyphInfo.offsetX,
+            pos.y + j + glyphInfo.offsetY
+        };
+        RenderAddClampGrayscaleBitmapSection(backbuffer, glyphPos,
             face->atlasData, face->atlasWidth, face->atlasHeight,
-            glyphInfo.originI, glyphInfo.originJ,
+            glyphInfo.atlasCoords,
             glyphInfo.width, glyphInfo.height);
 
         i += glyphInfo.advanceX / 64;
@@ -167,12 +169,12 @@ void RenderText(const FontFace* face, const char* text,
 
 // Anchor is in range (0-1, 0-1).
 void RenderText(const FontFace* face, const char* text,
-    int x, int y, Vec2 anchor, Vec4 color,
+    Vec2Int pos, Vec2 anchor, Vec4 color,
     GameBackbuffer* backbuffer)
 {
     int textWidth = GetTextWidth(face, text);
-    x -= (int)(anchor.x * textWidth);
-    y -= (int)(anchor.y * face->height);
+    pos.x -= (int)(anchor.x * textWidth);
+    pos.y -= (int)(anchor.y * face->height);
 
-    RenderText(face, text, x, y, color, backbuffer);
+    RenderText(face, text, pos, color, backbuffer);
 }
