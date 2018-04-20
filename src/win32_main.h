@@ -1,0 +1,53 @@
+#pragma once
+
+#include "main_platform.h"
+
+#define NOMINMAX
+#include <Windows.h>
+#include <Xaudio2.h>
+
+struct Win32Audio
+{
+    IXAudio2* xAudio2;
+    IXAudio2MasteringVoice* masterVoice;
+    IXAudio2SourceVoice* sourceVoice;
+    WAVEFORMATEXTENSIBLE format;
+    XAUDIO2_BUFFER buffer;
+
+    int sampleLatency;
+};
+
+struct Win32GameCode
+{
+	HMODULE gameCodeDLL;
+	FILETIME lastDLLWriteTime;
+
+	// These game functions can be NULL, you must check before calling them
+	GameUpdateAndRenderFunc* gameUpdateAndRender;
+
+	bool32 isValid;
+};
+
+struct Win32ReplayBuffer
+{
+	char filePath[MAX_PATH];
+	HANDLE fileHandle;
+	HANDLE memoryMap;
+	void* gameMemoryBlock;
+};
+
+struct Win32State
+{
+	uint64 gameMemorySize;
+	void* gameMemoryBlock;
+	Win32ReplayBuffer replayBuffers[4];
+
+	HANDLE recordingHandle;
+	int inputRecordingIndex;
+
+	HANDLE playbackHandle;
+	int inputPlayingIndex;
+
+	char exeFilePath[MAX_PATH];
+	char* exeOnePastLastSlash;
+};
