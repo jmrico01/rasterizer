@@ -3,7 +3,6 @@
 #include "km_defines.h"
 #include "km_math.h"
 #include "km_input.h"
-#include "opengl.h"
 
 struct ThreadContext
 {
@@ -39,15 +38,13 @@ typedef DEBUG_PLATFORM_WRITE_FILE_FUNC(DEBUGPlatformWriteFileFunc);
 
 #define MAX_KEYS_PER_FRAME 256
 
-struct ScreenInfo
+struct GameBackbuffer
 {
-	uint32 width;
-	uint32 height;
-
-	int8 colorBits;
-	int8 alphaBits;
-	int8 depthBits;
-	int8 stencilBits;
+    // Pixels are always 32-bits wide, memory order BB GG RR XX
+    void* data;
+    int width;
+    int height;
+    int bytesPerPixel;
 };
 
 struct GameButtonState
@@ -81,22 +78,13 @@ struct GameControllerInput
 struct GameInput
 {
 	GameButtonState mouseButtons[5];
-	int32 mouseX, mouseY, mouseWheel;
+	int mouseX, mouseY, mouseWheel;
 
     GameButtonState keyboard[KM_KEY_LAST];
     char keyboardString[MAX_KEYS_PER_FRAME];
     uint32 keyboardStringLen;
 
 	GameControllerInput controllers[4];
-};
-
-struct GameAudio
-{
-    uint32 channels;
-    uint32 sampleRate;
-    
-    uint32 bufferSize;
-    int16* buffer;
 };
 
 struct GameMemory
@@ -123,6 +111,6 @@ struct GameMemory
 
 // ------------------------------ Game functions ------------------------------
 #define GAME_UPDATE_AND_RENDER_FUNC(name) void name(ThreadContext* thread, \
-	GameMemory* memory, ScreenInfo screenInfo, GameInput* input, \
-    GameAudio* audio, OpenGLFunctions* glFunctions)
+	GameMemory* memory, GameBackbuffer* backbuffer, GameInput* input, \
+    float64 deltaTime)
 typedef GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRenderFunc);

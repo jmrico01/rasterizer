@@ -29,30 +29,22 @@ paths = { "root": GetLastSlashPath(GetScriptPath()) }
 
 paths["build"]          = paths["root"] + "/build"
 paths["data"]           = paths["root"] + "/data"
+paths["external"]       = paths["root"] + "/external"
 paths["src"]            = paths["root"] + "/src"
 
 paths["build-data"]     = paths["build"] + "/data"
 paths["build-shaders"]  = paths["build"] + "/shaders"
 paths["src-shaders"]    = paths["src"] + "/shaders"
 
-
 paths["main-cpp"]       = paths["src"] + "/main.cpp"
 paths["linux-main-cpp"] = paths["src"] + "/linux_main.cpp"
 paths["win32-main-cpp"] = paths["src"] + "/win32_main.cpp"
 
-"""
-paths["include-glew"]       = paths["external"] + "/glew-2.1.0/include"
-paths["include-glfw"]       = paths["external"] + "/glfw-3.2.1/include"
 paths["include-freetype"]   = paths["external"] + "/freetype-2.8.1/include"
-paths["include-lodepng"]    = paths["external"] + "/lodepng/include"
 
-paths["lib-glfw-win-d"] = paths["external"] + "/glfw-3.2.1/lib/win/debug"
-paths["lib-glfw-win-r"] = paths["external"] + "/glfw-3.2.1/lib/win/release"
-paths["lib-glfw-linux"] = paths["external"] + "/glfw-3.2.1/lib/linux"
 paths["lib-ft-win-d"]   = paths["external"] + "/freetype-2.8.1/lib/win/debug"
 paths["lib-ft-win-r"]   = paths["external"] + "/freetype-2.8.1/lib/win/release"
 paths["lib-ft-linux"]   = paths["external"] + "/freetype-2.8.1/lib/linux"
-"""
 
 paths["src-hashes"]     = paths["build"] + "/src_hashes"
 paths["src-hashes-old"] = paths["build"] + "/src_hashes_old"
@@ -86,10 +78,11 @@ def WinCompileDebug():
         "/wd4189",  # unused initialized local variable
         "/wd4201",  # nonstandard extension used: nameless struct/union
         "/wd4505",  # unreferenced local function has been removed
+
+        #"/wd4091"   # some freetype.h issue
     ])
     includePaths = " ".join([
-        #"/I" + paths["include-freetype"],
-        #"/I" + paths["include-lodepng"]
+        "/I" + paths["include-freetype"]
     ])
 
     linkerFlags = " ".join([
@@ -97,14 +90,12 @@ def WinCompileDebug():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        #"/LIBPATH:" + paths["lib-ft-win-d"]
+        "/LIBPATH:" + paths["lib-ft-win-d"]
     ])
     libs = " ".join([
         "user32.lib",
         "gdi32.lib",
-        "opengl32.lib",
-        "xaudio2.lib"
-        #"freetype281MTd.lib"
+        "freetype281MTd.lib"
     ])
 
     # Clear old PDB files
@@ -115,24 +106,24 @@ def WinCompileDebug():
             except:
                 print("Couldn't remove " + fileName)
 
-    pdbName = "315k_game" + str(random.randrange(99999)) + ".pdb"
+    pdbName = "rasterizer_game" + str(random.randrange(99999)) + ".pdb"
     compileDLLCommand = " ".join([
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/LD", "/Fe315k_game.dll", paths["main-cpp"],
-        "/link", linkerFlags, #libPaths, libs,
+        "/LD", "/Ferasterizer_game.dll", paths["main-cpp"],
+        "/link", linkerFlags, libPaths, libs,
         "/EXPORT:GameUpdateAndRender", "/PDB:" + pdbName])
 
     compileCommand = " ".join([
         "cl", "/DGAME_PLATFORM_CODE",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/Fe315k_win32.exe", "/Fm315k_win32.map", paths["win32-main-cpp"],
+        "/Ferasterizer_win32.exe", "/Fmrasterizer_win32.map", paths["win32-main-cpp"],
         "/link", linkerFlags, libPaths, libs])
     
     devenvCommand = "rem"
     if len(sys.argv) > 2:
         if sys.argv[2] == "devenv":
-            devenvCommand = "devenv 315k_win32.exe"
+            devenvCommand = "devenv rasterizer_win32.exe"
 
     loadCompiler = "call \"C:\\Program Files (x86)" + \
         "\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" x64"
@@ -199,17 +190,17 @@ def LinuxCompileDebug():
         #"-lpng"
     ])
 
-    #pdbName = "315k_game" + str(random.randrange(99999)) + ".pdb"
+    #pdbName = "rasterizer_game" + str(random.randrange(99999)) + ".pdb"
     compileLibCommand = " ".join([
         "gcc",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "-shared", "-fPIC", paths["main-cpp"], "-o 315k_game.so"
+        "-shared", "-fPIC", paths["main-cpp"], "-o rasterizer_game.so"
     ])
 
     compileCommand = " ".join([
         "gcc", "-DGAME_PLATFORM_CODE",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        paths["linux-main-cpp"], "-o 315k_linux",
+        paths["linux-main-cpp"], "-o rasterizer_linux",
         linkerFlags, libPaths, libs
     ])
 

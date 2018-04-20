@@ -2,12 +2,8 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <Xinput.h>
 #include <intrin.h> // __rdtsc
-//#include <mmdeviceapi.h>
-//#include <audioclient.h>
 
-#include "opengl.h"
 #include "km_debug.h"
 
 /*
@@ -35,40 +31,9 @@
 global_var char pathToApp_[MAX_PATH];
 global_var bool32 running_ = true;
 global_var GameInput* input_ = nullptr;             // for WndProc WM_CHAR
-global_var glViewportFunc* glViewport_ = nullptr;   // for WndProc WM_SIZE
-global_var ScreenInfo* screenInfo_ = nullptr;       // for WndProc WM_SIZE
+global_var Win32Backbuffer backbuffer_;
 
-global_var bool32 DEBUGshowCursor_;
 global_var WINDOWPLACEMENT DEBUGwpPrev = { sizeof(DEBUGwpPrev) };
-
-// XInput functions
-#define XINPUT_GET_STATE_FUNC(name) DWORD WINAPI name(DWORD dwUserIndex, \
-    XINPUT_STATE *pState)
-typedef XINPUT_GET_STATE_FUNC(XInputGetStateFunc);
-XINPUT_GET_STATE_FUNC(XInputGetStateStub)
-{
-	return ERROR_DEVICE_NOT_CONNECTED;
-}
-internal XInputGetStateFunc *xInputGetState_ = XInputGetStateStub;
-#define XInputGetState xInputGetState_
-
-#define XINPUT_SET_STATE_FUNC(name) DWORD WINAPI name(DWORD dwUserIndex, \
-    XINPUT_VIBRATION *pVibration)
-typedef XINPUT_SET_STATE_FUNC(XInputSetStateFunc);
-XINPUT_SET_STATE_FUNC(XInputSetStateStub)
-{
-	return ERROR_DEVICE_NOT_CONNECTED;
-}
-internal XInputSetStateFunc *xInputSetState_ = XInputSetStateStub;
-#define XInputSetState xInputSetState_
-
-// XAudio2 functions
-typedef HRESULT XAudio2CreateFunc(
-    _Out_   IXAudio2**          ppXAudio2,
-    _In_    UINT32              flags,
-    _In_    XAUDIO2_PROCESSOR   xAudio2Processor);
-internal XAudio2CreateFunc* xAudio2Create_ = NULL;
-#define XAudio2Create xAudio2Create_
 
 // WGL functions
 typedef BOOL WINAPI wglSwapIntervalEXTFunc(int interval);
@@ -100,7 +65,59 @@ internal void CatStrings(
 	*dest++ = '\0';
 }
 
-internal void Win32ToggleFullscreen(HWND hWnd, OpenGLFunctions* glFuncs)
+internal Win32WindowDimension Win32GetWindowDimension(HWND hWnd)
+{
+    Win32WindowDimension result;
+    
+    RECT clientRect;
+    GetClientRect(hWnd, &clientRect);
+    result.width = clientRect.right - clientRect.left;
+    result.height = clientRect.bottom - clientRect.top;
+
+    return result;
+}
+
+internal void Win32ResizeBackbuffer(Win32Backbuffer* buffer,
+    uint32 width, uint32 height)
+{
+    if (buffer->data) {
+        VirtualFree(buffer->data, 0, MEM_RELEASE);
+    }
+
+    buffer->width = width;
+    buffer->height = height;
+
+    buffer->info.bmiHeader.biSize = sizeof(buffer->info.bmiHeader);
+    buffer->info.bmiHeader.biWidth = buffer->width;
+    buffer->info.bmiHeader.biHeight = buffer->height;
+    buffer->info.bmiHeader.biPlanes = 1;
+    buffer->info.bmiHeader.biBitCount = 32;
+    buffer->info.bmiHeader.biCompression = BI_RGB;
+
+    int bytesPerPixel = 4;
+    int bitmapMemorySize = (buffer->width * buffer->height) * bytesPerPixel;
+    buffer->data = VirtualAlloc(0, bitmapMemorySize,
+        MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+    buffer->bytesPerPixel = bytesPerPixel;
+
+    // TODO: Probably clear this to black
+}
+
+internal void Win32DisplayBufferInWindow(Win32Backbuffer* buffer,
+    HDC hDC, int windowWidth, int windowHeight)
+{
+    // TODO: Aspect ratio correction
+    // TODO: Play with stretch modes
+    StretchDIBits(hDC,
+        0, 0, windowWidth, windowHeight,
+        0, 0, buffer->width, buffer->height,
+        buffer->data, &buffer->info,
+        DIB_RGB_COLORS, SRCCOPY);
+}
+
+
+internal void Win32ToggleFullscreen(HWND hWnd)
 {
 	// This follows Raymond Chen's perscription for fullscreen toggling. See:
 	// https://blogs.msdn.microsoft.com/oldnewthing/20100412-00/?p=14353
@@ -118,13 +135,9 @@ internal void Win32ToggleFullscreen(HWND hWnd, OpenGLFunctions* glFuncs)
 				monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
 				monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
 				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-			glFuncs->glViewport(
-				(GLint)monitorInfo.rcMonitor.left,
-                (GLint)monitorInfo.rcMonitor.top,
-				(GLsizei)(monitorInfo.rcMonitor.right
-                    - monitorInfo.rcMonitor.left),
-				(GLsizei)(monitorInfo.rcMonitor.bottom
-                    - monitorInfo.rcMonitor.top));
+            Win32ResizeBackbuffer(&backbuffer_,
+                monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+                monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top);
 		}
 	}
 	else {
@@ -136,10 +149,9 @@ internal void Win32ToggleFullscreen(HWND hWnd, OpenGLFunctions* glFuncs)
             | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 		RECT clientRect;
 		GetClientRect(hWnd, &clientRect);
-		glFuncs->glViewport(
-			(GLint)clientRect.left, (GLint)clientRect.top,
-			(GLsizei)(clientRect.right - clientRect.left),
-			(GLsizei)(clientRect.bottom - clientRect.top));
+        Win32ResizeBackbuffer(&backbuffer_,
+            clientRect.right - clientRect.left,
+            clientRect.bottom - clientRect.top);
 	}
 }
 
@@ -356,25 +368,6 @@ DEBUG_PLATFORM_WRITE_FILE_FUNC(DEBUGPlatformWriteFile)
 
 #endif
 
-internal void Win32LoadXInput()
-{
-	HMODULE xInputLib = LoadLibrary("xinput1_4.dll");
-	if (!xInputLib) {
-		xInputLib = LoadLibrary("xinput1_3.dll");
-    }
-	if (!xInputLib) {
-		// TODO warning message?
-		xInputLib = LoadLibrary("xinput9_1_0.dll");
-	}
-
-	if (xInputLib) {
-		XInputGetState = (XInputGetStateFunc*)GetProcAddress(xInputLib,
-            "XInputGetState");
-		XInputSetState = (XInputSetStateFunc*)GetProcAddress(xInputLib,
-            "XInputSetState");
-	}
-}
-
 LRESULT CALLBACK WndProc(
 	HWND hWnd, UINT message,
 	WPARAM wParam, LPARAM lParam)
@@ -393,25 +386,22 @@ LRESULT CALLBACK WndProc(
 			// TODO handle this as an error?
 			running_ = false;
 		} break;
+        
+        case WM_PAINT:
+        {
+            PAINTSTRUCT paint;
+            HDC hDC = BeginPaint(hWnd, &paint);
+            Win32WindowDimension dimension = Win32GetWindowDimension(hWnd);
+            Win32DisplayBufferInWindow(&backbuffer_, hDC,
+                dimension.width, dimension.height);
+            EndPaint(hWnd, &paint);
+        } break;
 
         case WM_SIZE: {
             int width = LOWORD(lParam);
             int height = HIWORD(lParam);
-            if (glViewport_) {
-                glViewport_(0, 0, width, height);
-            }
-            if (screenInfo_) {
-                screenInfo_->width = width;
-                screenInfo_->height = height;
-            }
+            Win32ResizeBackbuffer(&backbuffer_, width, height);
         } break;
-
-		case WM_SETCURSOR: {
-			if (DEBUGshowCursor_)
-				result = DefWindowProc(hWnd, message, wParam, lParam);
-			else
-				SetCursor(0);
-		} break;
 
 		case WM_SYSKEYDOWN: {
             DEBUG_PANIC("WM_SYSKEYDOWN in WndProc");
@@ -490,9 +480,7 @@ internal int Win32KeyCodeToKM(int vkCode)
     }
 }
 
-internal void Win32ProcessMessages(
-	HWND hWnd, GameInput* gameInput,
-	OpenGLFunctions* glFuncs)
+internal void Win32ProcessMessages(HWND hWnd, GameInput* gameInput)
 {
 	MSG msg;
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
@@ -529,7 +517,7 @@ internal void Win32ProcessMessages(
 				running_ = false;
             }
             if (vkCode == VK_F11) {
-                Win32ToggleFullscreen(hWnd, glFuncs);
+                Win32ToggleFullscreen(hWnd);
             }
 
             // Pass over to WndProc for WM_CHAR messages (string input)
@@ -570,351 +558,13 @@ internal void Win32ClearInput(GameInput* input, GameInput* inputPrev)
     input->keyboardStringLen = 0;
 }
 
-internal void Win32ProcessXInputButton(
-	DWORD xInputButtonState,
-	GameButtonState *oldState,
-	DWORD buttonBit,
-	GameButtonState *newState)
-{
-	newState->isDown = ((xInputButtonState & buttonBit) == buttonBit);
-	newState->transitions = (oldState->isDown != newState->isDown) ? 1 : 0;
-}
-
-internal float32 Win32ProcessXInputStickValue(SHORT value, SHORT deadZone)
-{
-	if (value < -deadZone) {
-		return (float32)(value + deadZone) / (32768.0f - deadZone);
-    }
-	else if (value > deadZone) {
-		return (float32)(value - deadZone) / (32767.0f - deadZone);
-    }
-	else {
-		return 0.0f;
-    }
-}
-
-internal void Win32RecordInputBegin(Win32State* state, int inputRecordingIndex)
-{
-	DEBUG_ASSERT(inputRecordingIndex < ARRAY_COUNT(state->replayBuffers));
-
-	Win32ReplayBuffer* replayBuffer =
-        &state->replayBuffers[inputRecordingIndex];
-	if (replayBuffer->gameMemoryBlock) {
-		state->inputRecordingIndex = inputRecordingIndex;
-
-		char filePath[MAX_PATH];
-		Win32GetInputFileLocation(state, true, inputRecordingIndex,
-			sizeof(filePath), filePath);
-		state->recordingHandle = CreateFile(filePath, GENERIC_WRITE,
-			0, NULL, CREATE_ALWAYS, 0, NULL);
-
-		CopyMemory(replayBuffer->gameMemoryBlock,
-            state->gameMemoryBlock, state->gameMemorySize);
-	}
-}
-internal void Win32RecordInputEnd(Win32State* state)
-{
-	state->inputRecordingIndex = 0;
-	CloseHandle(state->recordingHandle);
-}
-internal void Win32RecordInput(Win32State* state, GameInput* input)
-{
-	DWORD bytesWritten;
-	WriteFile(state->recordingHandle,
-        input, sizeof(*input), &bytesWritten, NULL);
-}
-
-internal void Win32PlaybackBegin(Win32State* state, int inputPlayingIndex)
-{
-	DEBUG_ASSERT(inputPlayingIndex < ARRAY_COUNT(state->replayBuffers));
-	Win32ReplayBuffer* replayBuffer = &state->replayBuffers[inputPlayingIndex];
-
-	if (replayBuffer->gameMemoryBlock)
-	{
-		state->inputPlayingIndex = inputPlayingIndex;
-
-		char filePath[MAX_PATH];
-		Win32GetInputFileLocation(state, true, inputPlayingIndex,
-			sizeof(filePath), filePath);
-		state->playbackHandle = CreateFile(filePath, GENERIC_READ,
-			0, NULL, OPEN_EXISTING, 0, NULL);
-
-		CopyMemory(state->gameMemoryBlock, replayBuffer->gameMemoryBlock, state->gameMemorySize);
-	}
-}
-internal void Win32PlaybackEnd(Win32State* state)
-{
-	state->inputPlayingIndex = 0;
-	CloseHandle(state->playbackHandle);
-}
-internal void Win32PlayInput(Win32State* state, GameInput* input)
-{
-	DWORD bytesRead;
-	if (ReadFile(state->playbackHandle,
-    input, sizeof(*input), &bytesRead, NULL)) {
-		if (bytesRead == 0) {
-			int playingIndex = state->inputPlayingIndex;
-			Win32PlaybackEnd(state);
-			Win32PlaybackBegin(state, playingIndex);
-		}
-	}
-}
-
-#define LOAD_GL_FUNCTION(name) \
-    glFuncs->name = (name##Func*)wglGetProcAddress(#name); \
-    if (!glFuncs->name) { \
-        glFuncs->name = (name##Func*)GetProcAddress(oglLib, #name); \
-        if (!glFuncs->name) { \
-            DEBUG_PRINT("OpenGL function load failed: %s", #name); \
-        } \
-    }
-
-internal bool Win32LoadBaseGLFunctions(
-    OpenGLFunctions* glFuncs, const HMODULE& oglLib)
-{
-	// Generate function loading code
-#define FUNC(returntype, name, ...) LOAD_GL_FUNCTION(name);
-	GL_FUNCTIONS_BASE
-#undef FUNC
-
-	return true;
-}
-
-internal bool Win32LoadAllGLFunctions(
-    OpenGLFunctions* glFuncs, const HMODULE& oglLib)
-{
-	// Generate function loading code
-#define FUNC(returntype, name, ...) LOAD_GL_FUNCTION(name);
-	GL_FUNCTIONS_ALL
-#undef FUNC
-
-	return true;
-}
-
-internal bool Win32InitOpenGL(OpenGLFunctions* glFuncs,
-    int width, int height)
-{
-	HMODULE oglLib = LoadLibrary("opengl32.dll");
-    if (!oglLib) {
-        DEBUG_PRINT("Failed to load opengl32.dll\n");
-        return false;
-    }
-
-	if (!Win32LoadBaseGLFunctions(glFuncs, oglLib)) {
-		// TODO logging (base GL loading failed, but context exists. weirdness)
-		return false;
-	}
-    glViewport_ = glFuncs->glViewport;
-
-	glFuncs->glViewport(0, 0, width, height);
-
-	// Set v-sync
-	// NOTE this isn't technically complete. we have to ask Windows
-    // if the extensions are loaded, and THEN look for the
-    // extension function name
-	wglSwapInterval = (wglSwapIntervalEXTFunc*)
-        wglGetProcAddress("wglSwapIntervalEXT");
-	if (wglSwapInterval) {
-		wglSwapInterval(0);
-	}
-	else {
-		// TODO no vsync. logging? just exit? just exit for now
-		return false;
-	}
-
-	const GLubyte* vendorString = glFuncs->glGetString(GL_VENDOR);
-	DEBUG_PRINT("GL_VENDOR: %s\n", vendorString);
-	const GLubyte* rendererString = glFuncs->glGetString(GL_RENDERER);
-	DEBUG_PRINT("GL_RENDERER: %s\n", rendererString);
-	const GLubyte* versionString = glFuncs->glGetString(GL_VERSION);
-	DEBUG_PRINT("GL_VERSION: %s\n", versionString);
-
-	int32 majorVersion = versionString[0] - '0';
-	int32 minorVersion = versionString[2] - '0';
-
-	if (majorVersion < 3 || (majorVersion == 3 && minorVersion < 3)) {
-		// TODO logging. opengl version is less than 3.3
-		return false;
-	}
-
-	if (!Win32LoadAllGLFunctions(glFuncs, oglLib)) {
-		// TODO logging (couldn't load all functions, but version is 3.3+)
-		return false;
-	}
-
-	const GLubyte* glslString =
-        glFuncs->glGetString(GL_SHADING_LANGUAGE_VERSION);
-    DEBUG_PRINT("GL_SHADING_LANGUAGE_VERSION: %s\n", glslString);
-
-	return true;
-}
-
-internal bool Win32InitAudio(Win32Audio* winAudio, GameAudio* gameAudio,
-    uint32 channels, uint32 sampleRate, uint32 bufSampleLength)
-{
-    // Only support stereo for now
-    DEBUG_ASSERT(channels == 2);
-
-    // Try to load Windows 10 version
-	HMODULE xAudio2Lib = LoadLibrary("xaudio2_9.dll");
-	if (!xAudio2Lib) {
-        // Fall back to Windows 8 version
-		xAudio2Lib = LoadLibrary("xaudio2_8.dll");
-    }
-	if (!xAudio2Lib) {
-        // Fall back to Windows 7 version
-		xAudio2Lib = LoadLibrary("xaudio2_7.dll");
-	}
-    if (!xAudio2Lib) {
-        // TODO load earlier versions?
-        DEBUG_PRINT("Could not find a valid XAudio2 DLL\n");
-        return false;
-    }
-
-    XAudio2Create = (XAudio2CreateFunc*)GetProcAddress(
-        xAudio2Lib, "XAudio2Create");
-    if (!XAudio2Create) {
-        DEBUG_PRINT("Failed to load XAudio2Create function\n");
-        return false;
-    }
-
-    HRESULT hr;
-    hr = XAudio2Create(&winAudio->xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-    if (FAILED(hr)) {
-        DEBUG_PRINT("Failed to create XAudio2 instance, HRESULT %x\n", hr);
-        return false;
-    }
-
-    hr = winAudio->xAudio2->CreateMasteringVoice(&winAudio->masterVoice,
-        channels,
-        sampleRate,
-        0,
-        NULL
-    );
-    if (FAILED(hr)) {
-        DEBUG_PRINT("Failed to create mastering voice, HRESULT %x\n", hr);
-        return false;
-    }
-
-    winAudio->format.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    winAudio->format.Format.nChannels = (WORD)channels;
-    winAudio->format.Format.nSamplesPerSec = (DWORD)sampleRate;
-    winAudio->format.Format.nAvgBytesPerSec = (DWORD)(
-        sampleRate * channels * sizeof(int16));
-    winAudio->format.Format.nBlockAlign = (WORD)(channels * sizeof(int16));
-    winAudio->format.Format.wBitsPerSample = (WORD)(sizeof(int16) * 8);
-    winAudio->format.Format.cbSize = (WORD)(
-        sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX));
-    winAudio->format.Samples.wValidBitsPerSample =
-        winAudio->format.Format.wBitsPerSample;
-    winAudio->format.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
-    winAudio->format.SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
-
-    hr = winAudio->xAudio2->CreateSourceVoice(&winAudio->sourceVoice,
-        (const WAVEFORMATEX*)&winAudio->format);
-    if (FAILED(hr)) {
-        DEBUG_PRINT("Failed to create source voice, HRESULT %x\n", hr);
-        return false;
-    }
-
-    // TODO temporary malloc use
-    gameAudio->channels = channels;
-    gameAudio->sampleRate = sampleRate;
-    gameAudio->bufferSize = bufSampleLength;
-    gameAudio->buffer = (int16*)malloc(
-        bufSampleLength * channels * sizeof(int16));
-    for (uint32 i = 0; i < bufSampleLength; i++) {
-        gameAudio->buffer[i * channels] = 0;
-        gameAudio->buffer[i * channels + 1] = 0;
-    }
-
-    winAudio->buffer.Flags = 0;
-    winAudio->buffer.AudioBytes = bufSampleLength * channels * sizeof(int16);
-    winAudio->buffer.pAudioData = (const BYTE*)gameAudio->buffer;
-    winAudio->buffer.PlayBegin = 0;
-    winAudio->buffer.PlayLength = 0;
-    winAudio->buffer.LoopBegin = 0;
-    winAudio->buffer.LoopLength = 0;
-    winAudio->buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
-    winAudio->buffer.pContext = NULL;
-
-    hr = winAudio->sourceVoice->SubmitSourceBuffer(&winAudio->buffer);
-    if (FAILED(hr)) {
-        DEBUG_PRINT("Failed to submit buffer, HRESULT %x\n", hr);
-        return false;
-    }
-
-    hr = winAudio->sourceVoice->Start(0);
-    if (FAILED(hr)) {
-        DEBUG_PRINT("Failed to start source voice, HRESULT %x\n", hr);
-        return false;
-    }
-
-    return true;
-}
-
-internal bool Win32CreateRC(HWND hWnd,
-	BYTE colorBits, BYTE alphaBits, BYTE depthBits, BYTE stencilBits)
-{
-	// TODO these calls in total add about 40MB to program memory
-	//      ...why?
-
-	HDC hDC = GetDC(hWnd);
-	if (!hDC) {
-		// TODO log
-		return false;
-	}
-
-	// Define and set pixel format
-	PIXELFORMATDESCRIPTOR desiredPFD = { sizeof(desiredPFD) };
-	desiredPFD.nVersion = 1;
-	desiredPFD.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW
-        | PFD_DOUBLEBUFFER;
-	desiredPFD.iPixelType = PFD_TYPE_RGBA;
-	desiredPFD.cColorBits = colorBits;
-	desiredPFD.cAlphaBits = alphaBits;
-	desiredPFD.cDepthBits = depthBits;
-	desiredPFD.cStencilBits = stencilBits;
-	desiredPFD.iLayerType = PFD_MAIN_PLANE;
-	int pixelFormat = ChoosePixelFormat(hDC, &desiredPFD);
-	if (!pixelFormat) {
-		// TODO log
-		DWORD error = GetLastError();
-		return false;
-	}
-
-	PIXELFORMATDESCRIPTOR suggestedPFD = {};
-	DescribePixelFormat(hDC, pixelFormat, sizeof(suggestedPFD), &suggestedPFD);
-	if (!SetPixelFormat(hDC, pixelFormat, &suggestedPFD)) {
-		// TODO log
-		DWORD error = GetLastError();
-		return false;
-	}
-
-	// Create and attach OpenGL rendering context to this thread
-	HGLRC hGLRC = wglCreateContext(hDC);
-	if (!hGLRC) {
-		// TODO log
-		DWORD error = GetLastError();
-		return false;
-	}
-	if (!wglMakeCurrent(hDC, hGLRC)) {
-		// TODO log
-		DWORD error = GetLastError();
-		return false;
-	}
-
-	ReleaseDC(hWnd, hDC);
-	return true;
-}
-
 internal HWND Win32CreateWindow(
 	HINSTANCE hInstance,
 	const char* className, const char* windowName,
 	int x, int y, int clientWidth, int clientHeight)
 {
 	WNDCLASSEX wndClass = { sizeof(wndClass) };
-	wndClass.style = CS_HREDRAW | CS_VREDRAW;
+	wndClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	wndClass.lpfnWndProc = WndProc;
 	wndClass.hInstance = hInstance;
 	//wndClass.hIcon = NULL;
@@ -973,69 +623,29 @@ int CALLBACK WinMain(
     RemoveFileNameFromPath(state.exeFilePath, pathToApp_, MAX_PATH);
     DEBUG_PRINT("Path to executable: %s\n", pathToApp_);
 
-	Win32LoadXInput();
-
 	// Create window
 	HWND hWnd = Win32CreateWindow(hInstance,
-		"OpenGLWindowClass", "315K",
+		"OpenGLWindowClass", "rasterizer",
 		100, 100, START_WIDTH, START_HEIGHT);
 	if (!hWnd) {
 		return 1;
     }
     DEBUG_PRINT("Created Win32 window\n");
 
-	RECT clientRect;
-	GetClientRect(hWnd, &clientRect);
-	ScreenInfo screenInfo = {};
-	screenInfo.width = clientRect.right - clientRect.left;
-	screenInfo.height = clientRect.bottom - clientRect.top;
-	// TODO is cColorBits ACTUALLY excluding alpha bits? Doesn't seem like it
-	screenInfo.colorBits = 32;
-	screenInfo.alphaBits = 8;
-	screenInfo.depthBits = 24;
-	screenInfo.stencilBits = 0;
-    screenInfo_ = &screenInfo;
+    // Get DC, use it forever because we specified CS_OWNDC
+    HDC hDC = GetDC(hWnd);
 
-	// Create and attach rendering context for OpenGL
-	if (!Win32CreateRC(hWnd, screenInfo.colorBits, screenInfo.alphaBits,
-	screenInfo.depthBits, screenInfo.stencilBits)) {
-		return 1;
-    }
-    DEBUG_PRINT("Created Win32 OpenGL rendering context\n");
-
-	OpenGLFunctions glFuncs = {};
-
-	// Initialize OpenGL
-	if (!Win32InitOpenGL(&glFuncs, screenInfo.width, screenInfo.height)) {
-		return 1;
-    }
-    DEBUG_PRINT("Initialized Win32 OpenGL\n");
+    Win32ResizeBackbuffer(&backbuffer_, START_WIDTH, START_HEIGHT);
 
 	// Try to get monitor refresh rate
 	// TODO make this more reliable
 	int monitorRefreshHz = 60;
     {
-		HDC hDC = GetDC(hWnd);
 		int win32RefreshRate = GetDeviceCaps(hDC, VREFRESH);
-		if (win32RefreshRate > 1)
+		if (win32RefreshRate > 1) {
 			monitorRefreshHz = win32RefreshRate;
-		ReleaseDC(hWnd, hDC);
+        }
 	}
-
-    // Initialize audio
-    Win32Audio winAudio = {};
-    GameAudio gameAudio = {};
-    uint32 bufNumSamples = SAMPLERATE * AUDIO_BUFFER_SIZE_MILLISECONDS / 1000;
-    if (!Win32InitAudio(&winAudio, &gameAudio, 2, SAMPLERATE, bufNumSamples)) {
-        return 1;
-    }
-    winAudio.sampleLatency = SAMPLERATE / 10;
-    DEBUG_PRINT("Initialized Win32 audio\n");
-
-    // TODO probably remove this later
-#if GAME_INTERNAL
-	DEBUGshowCursor_ = true;
-#endif
 
 #if GAME_INTERNAL
 	LPVOID baseAddress = (LPVOID)TERABYTES((uint64)2);;
@@ -1072,36 +682,11 @@ int CALLBACK WinMain(
 	}
 	DEBUG_PRINT("Initialized game memory\n");
 
-	for (int replayIndex = 0;
-	replayIndex < ARRAY_COUNT(state.replayBuffers);
-	replayIndex++) {
-		Win32ReplayBuffer* replayBuffer = &state.replayBuffers[replayIndex];
-
-		Win32GetInputFileLocation(&state, false, replayIndex,
-			sizeof(replayBuffer->filePath), replayBuffer->filePath);
-
-		replayBuffer->fileHandle = CreateFile(replayBuffer->filePath,
-			GENERIC_READ | GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, NULL);
-
-		LARGE_INTEGER maxSize;
-		maxSize.QuadPart = state.gameMemorySize;
-		replayBuffer->memoryMap = CreateFileMapping(
-			replayBuffer->fileHandle, 0, PAGE_READWRITE,
-			maxSize.HighPart, maxSize.LowPart, NULL);
-		replayBuffer->gameMemoryBlock = MapViewOfFile(
-			replayBuffer->memoryMap, FILE_MAP_ALL_ACCESS, 0, 0,
-            state.gameMemorySize);
-
-		// TODO possibly check if this memory block "allocation" fails
-		// Debug, so not really that important
-	}
-	DEBUG_PRINT("Initialized input replay system\n");
-
 	char gameCodeDLLPath[MAX_PATH];
-	Win32BuildExePathFileName(&state, "315k_game.dll",
+	Win32BuildExePathFileName(&state, "rasterizer_game.dll",
         MAX_PATH, gameCodeDLLPath);
 	char tempCodeDLLPath[MAX_PATH];
-	Win32BuildExePathFileName(&state, "315k_game_temp.dll",
+	Win32BuildExePathFileName(&state, "rasterizer_game_temp.dll",
         MAX_PATH, tempCodeDLLPath);
 
 	GameInput input[2] = {};
@@ -1122,12 +707,6 @@ int CALLBACK WinMain(
 
 	Win32GameCode gameCode =
         Win32LoadGameCode(gameCodeDLLPath, tempCodeDLLPath);
-    
-    // TODO This is actually game-specific code
-    float32 toneHz = 300.0f;
-    uint32 runningSampleIndex = 0;
-    float32 tSine1 = 0.0f;
-    float32 tSine2 = 0.0f;
 
 	running_ = true;
 	while (running_) {
@@ -1140,13 +719,13 @@ int CALLBACK WinMain(
 		}
 
         // Process keyboard input & other messages
-		Win32ProcessMessages(hWnd, newInput, &glFuncs);
+		Win32ProcessMessages(hWnd, newInput);
 
 		POINT mousePos;
 		GetCursorPos(&mousePos);
 		ScreenToClient(hWnd, &mousePos);
 		newInput->mouseX = mousePos.x;
-		newInput->mouseY = screenInfo.height - mousePos.y;
+		newInput->mouseY = backbuffer_.height - mousePos.y;
 		newInput->mouseWheel = 0;
 		newInput->mouseButtons[0].isDown = (int32)GetKeyState(VK_LBUTTON);
 		newInput->mouseButtons[1].isDown = (int32)GetKeyState(VK_RBUTTON);
@@ -1154,201 +733,40 @@ int CALLBACK WinMain(
 		newInput->mouseButtons[3].isDown = (int32)GetKeyState(VK_XBUTTON1);
 		newInput->mouseButtons[4].isDown = (int32)GetKeyState(VK_XBUTTON2);
 
-		DWORD maxControllerCount = XUSER_MAX_COUNT;
-		if (maxControllerCount > ARRAY_COUNT(newInput->controllers)) {
-			maxControllerCount = ARRAY_COUNT(newInput->controllers);
-        }
-		// TODO should we poll this more frequently?
-		for (DWORD controllerInd = 0;
-		controllerInd < maxControllerCount;
-		controllerInd++) {
-			GameControllerInput *oldController =
-                &oldInput->controllers[controllerInd];
-			GameControllerInput *newController =
-                &newInput->controllers[controllerInd];
-
-			XINPUT_STATE controllerState;
-			// TODO the get state function has a really bad performance bug
-			// which causes it to stall for a couple ms if a controller
-            // isn't connected
-			if (XInputGetState(controllerInd, &controllerState)
-            == ERROR_SUCCESS) {
-				newController->isConnected = true;
-
-				// TODO check controller_state.dwPacketNumber
-				XINPUT_GAMEPAD *pad = &controllerState.Gamepad;
-
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->a, XINPUT_GAMEPAD_A,
-					&newController->a);
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->b, XINPUT_GAMEPAD_B,
-					&newController->b);
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->x, XINPUT_GAMEPAD_X,
-					&newController->x);
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->y, XINPUT_GAMEPAD_Y,
-					&newController->y);
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->lShoulder, XINPUT_GAMEPAD_LEFT_SHOULDER,
-					&newController->lShoulder);
-				Win32ProcessXInputButton(pad->wButtons,
-					&oldController->rShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER,
-					&newController->rShoulder);
-
-				newController->start = oldController->end;
-
-				// TODO check if the deadzone is round
-				newController->end.x = Win32ProcessXInputStickValue(
-					pad->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-				newController->end.y = Win32ProcessXInputStickValue(
-					pad->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-
-#if 0
-				XINPUT_VIBRATION vibration;
-				vibration.wLeftMotorSpeed = 4000;
-				vibration.wRightMotorSpeed = 10000;
-				XInputSetState(controllerInd, &vibration);
-#endif
-			}
-			else {
-				newController->isConnected = false;
-			}
-		}
-
-		// Recording game input
-		if (newInput->controllers[0].lShoulder.isDown
-        && newInput->controllers[0].lShoulder.transitions > 0
-		&& state.inputPlayingIndex == 0) {
-			if (state.inputRecordingIndex == 0) {
-				Win32RecordInputBegin(&state, 1);
-				DEBUG_PRINT("RECORDING - START\n");
-			}
-			else {
-				Win32RecordInputEnd(&state);
-				DEBUG_PRINT("RECORDING - STOP\n");
-			}
-		}
-		if (newInput->controllers[0].rShoulder.isDown
-        && newInput->controllers[0].rShoulder.transitions > 0
-		&& state.inputRecordingIndex == 0) {
-			if (state.inputPlayingIndex == 0) {
-				Win32PlaybackBegin(&state, 1);
-				DEBUG_PRINT("-> PLAYING - START\n");
-			}
-			else {
-				Win32PlaybackEnd(&state);
-				DEBUG_PRINT("-> PLAYING - STOP\n");
-			}
-		}
-
-		if (state.inputRecordingIndex) {
-			Win32RecordInput(&state, newInput);
-		}
-		if (state.inputPlayingIndex) {
-			Win32PlayInput(&state, newInput);
-		}
-
-#if GAME_INTERNAL
-		if (newInput->controllers[0].y.isDown
-        && newInput->controllers[0].y.transitions > 0) {
-			gameMemory.isInitialized = false;
-		}
-#endif
+		ThreadContext thread = {};
+        GameBackbuffer gameBackbuffer = {};
+        gameBackbuffer.data = backbuffer_.data;
+        gameBackbuffer.width = backbuffer_.width;
+        gameBackbuffer.height = backbuffer_.height;
+        gameBackbuffer.bytesPerPixel = backbuffer_.bytesPerPixel;
+        
+        LARGE_INTEGER timerEnd;
+        QueryPerformanceCounter(&timerEnd);
+        uint64 cyclesEnd = __rdtsc();
+        int64 cyclesElapsed = cyclesEnd - cyclesLast;
+        int64 timerElapsed = timerEnd.QuadPart - timerLast.QuadPart;
+        float64 elapsed = (float64)timerElapsed / timerFreq;
+        float64 fps = (float64)timerFreq / timerElapsed;
+        int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
+        timerLast = timerEnd;
+        cyclesLast = cyclesEnd;
+        DEBUG_PRINT("%fs/f, %ff/s, %dMc/f\n",
+            elapsed, fps, mCyclesPerFrame);
 
 		if (gameCode.gameUpdateAndRender) {
-			ThreadContext thread = {};
 			gameCode.gameUpdateAndRender(&thread, &gameMemory,
-                screenInfo, newInput, &gameAudio, &glFuncs);
+                &gameBackbuffer, newInput, elapsed);
         }
 
-        XAUDIO2_VOICE_STATE voiceState;
-        winAudio.sourceVoice->GetState(&voiceState);
-        uint32 playMark = (uint32)voiceState.SamplesPlayed
-            % gameAudio.bufferSize;
-        uint32 fillTarget = (playMark + winAudio.sampleLatency)
-            % gameAudio.bufferSize;
-        uint32 writeTo = runningSampleIndex % gameAudio.bufferSize;
-        uint32 writeLen;
-        if (writeTo == fillTarget) {
-            writeLen = gameAudio.bufferSize;
-        }
-        else if (writeTo > fillTarget) {
-            writeLen = gameAudio.bufferSize - (writeTo - fillTarget);
-        }
-        else {
-            writeLen = fillTarget - writeTo;
-        }
-
-        float tone1Hz = 261.6f;
-        float tone2Hz = tone1Hz
-            * (1.0f + 0.5f * newInput->controllers[0].end.x)
-            * (1.0f + 0.1f * newInput->controllers[0].end.y);
-        DEBUG_PRINT("tone freq: %f\n", tone2Hz);
-        for (uint32 i = 0; i < writeLen; i++) {
-            uint32 ind = (writeTo + i) % gameAudio.bufferSize;
-            //float32 t = (float32)runningSampleIndex / gameAudio.sampleRate;
-            int16 sin1Sample = (int16)(INT16_MAXVAL * sinf(
-                /*2.0f * PI_F * tone1Hz * t*/tSine1));
-            int16 sin2Sample = (int16)(INT16_MAXVAL * sinf(
-                /*2.0f * PI_F * tone2Hz * t*/tSine2));
-            gameAudio.buffer[ind * gameAudio.channels]      = sin1Sample;
-            gameAudio.buffer[ind * gameAudio.channels + 1]  = sin2Sample;
-
-            tSine1 += 2.0f * PI_F * tone1Hz * 1.0f
-                / (float32)gameAudio.sampleRate;
-            tSine2 += 2.0f * PI_F * tone2Hz * 1.0f
-                / (float32)gameAudio.sampleRate;
-
-            //gameAudio.buffer[ind * gameAudio.channels] = sinSample2;
-
-            runningSampleIndex++;
-        }
-
-		LARGE_INTEGER vsyncStart;
-		QueryPerformanceCounter(&vsyncStart);
-		// NOTE
-		// SwapBuffers seems to effectively stall for vsync target time
-		// It's probably more complicated than that under the hood,
-		// but it does (I believe) effectively sleep your thread and yield
-		// CPU time to other processes until the vsync target time is hit
-		HDC hDC = GetDC(hWnd);
-		SwapBuffers(hDC);
-		ReleaseDC(hWnd, hDC);
-		LARGE_INTEGER vsyncEnd;
-		QueryPerformanceCounter(&vsyncEnd);
-
-		int64 vsyncElapsed = vsyncEnd.QuadPart - vsyncStart.QuadPart;
-		float32 vsyncElapsedMS = 1000.0f * vsyncElapsed / timerFreq;
-		//DEBUG_PRINT("SwapBuffers took %f ms\n", vsyncElapsedMS);
-
-		LARGE_INTEGER timerEnd;
-		QueryPerformanceCounter(&timerEnd);
-		uint64 cyclesEnd = __rdtsc();
-
-		int64 cyclesElapsed = cyclesEnd - cyclesLast;
-		int64 timerElapsed = timerEnd.QuadPart - timerLast.QuadPart;
-		float32 elapsedMS = 1000.0f * timerElapsed / timerFreq;
-		float32 fps = (float32)timerFreq / timerElapsed;
-		int32 mCyclesPerFrame = (int32)(cyclesElapsed / (1000 * 1000));
-
-		/*DEBUG_PRINT("Rest of loop took %d ms\n",
-            elapsedMS - vsyncElapsedMS);*/
-
-        /*DEBUG_PRINT("%fms/f, %ff/s, %dMc/f\n",
-            elapsedMS, fps, mCyclesPerFrame);*/
-
-		timerLast = timerEnd;
-		cyclesLast = cyclesEnd;
+        Win32WindowDimension dimension = Win32GetWindowDimension(hWnd);
+        Win32DisplayBufferInWindow(&backbuffer_, hDC,
+            dimension.width, dimension.height);
 
 		GameInput *temp = newInput;
 		newInput = oldInput;
 		oldInput = temp;
         Win32ClearInput(newInput, oldInput);
 	}
-
-    winAudio.sourceVoice->Stop();
 
 	return 0;
 }

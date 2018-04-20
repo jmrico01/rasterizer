@@ -1741,7 +1741,7 @@ int main(int argc, char **argv)
     sizeHints.flags = USSize | USPosition; // US vs PS?
 
     XSetNormalHints(display, glWindow, &sizeHints);
-    XSetStandardProperties(display, glWindow, "315K", "glsync text",
+    XSetStandardProperties(display, glWindow, "rasterizer", "glsync text",
         None, NULL, 0, &sizeHints);
 
     Atom wmDeleteWindow = XInternAtom(display, "WM_DELETE_WINDOW", False);
@@ -1840,7 +1840,7 @@ int main(int argc, char **argv)
 	DEBUG_PRINT("Initialized game memory\n");
 
     char gameCodeLibPath[LINUX_STATE_FILE_NAME_COUNT];
-    LinuxBuildEXEPathFileName(&linuxState, "315k_game.so",
+    LinuxBuildEXEPathFileName(&linuxState, "rasterizer_game.so",
         sizeof(gameCodeLibPath), gameCodeLibPath);
 
 	GameInput input[2] = {};

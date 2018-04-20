@@ -1,46 +1,48 @@
 #pragma once
-#define MAX_GLYPHS 128
 
-#include <GL/glew.h>
+#define MAX_GLYPHS 128
+#define ATLAS_DIM_MIN 128
+#define ATLAS_DIM_MAX 2048
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include "main.h"
+#include "main_platform.h"
 #include "km_math.h"
 
-struct TextGL
-{
-    GLuint vertexArray;
-    GLuint vertexBuffer;
-    GLuint uvBuffer;
-    GLuint programID;
-};
 struct GlyphInfo
 {
-    unsigned int width;
-    unsigned int height;
+    uint32 originI;
+    uint32 originJ;
+    uint32 width;
+    uint32 height;
     int offsetX;
     int offsetY;
     int advanceX;
     int advanceY;
-    Vec2 uvOrigin;
-    Vec2 uvSize;
 };
 struct FontFace
 {
-    GLuint atlasTexture;
-    unsigned int height;
+    uint32 height;
     GlyphInfo glyphInfo[MAX_GLYPHS];
+
+    uint8 atlasData[ATLAS_DIM_MAX * ATLAS_DIM_MAX * sizeof(uint8)];
+    uint32 atlasWidth;
+    uint32 atlasHeight;
 };
 
-TextGL CreateTextGL();
-FontFace LoadFontFace(
+bool LoadFontFace(ThreadContext* thread,
     FT_Library library,
-    const char* path, unsigned int height);
+    const char* path, uint32 height,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory,
+    FontFace* fontFace);
 
-int GetTextWidth(const FontFace& face, const char* text);
-void DrawText(
-    TextGL textGL, const FontFace& face,
-    const char* text, Vec3 pos, Vec2 anchor, Vec4 color);
-void DrawText(
-    TextGL textGL, const FontFace& face,
-    const char* text, Vec3 pos, Vec4 color);
+int GetTextWidth(const FontFace* face, const char* text);
+void RenderText(const FontFace* face, const char* text,
+    int x, int y, Vec4 color,
+    GameBackbuffer* backbuffer);
+void RenderText(const FontFace* face, const char* text,
+    int x, int y, Vec2 anchor, Vec4 color,
+    GameBackbuffer* backbuffer);
