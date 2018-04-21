@@ -22,6 +22,10 @@ void RenderAddClampGrayscaleBitmapSection(
     Vec2Int origin, int sectionWidth, int sectionHeight,
     Vec3 colorMult);
 
+void RenderOverwriteColorBitmap(
+    GameBackbuffer* backbuffer, Vec2Int pos,
+    Bitmap* bitmap);
+
 void RenderTriangleWire(GameBackbuffer* backbuffer,
     Vec3Int verts[3], Vec3 color);
 void RenderTriangleFlat(GameBackbuffer* backbuffer,
@@ -30,6 +34,10 @@ void RenderTriangleGouraud(GameBackbuffer* backbuffer,
     Vec3Int verts[3], Vec3 colors[3]);
 void RenderTrianglePhong(GameBackbuffer* backbuffer,
     Vec3Int verts[3], Vec3 camVerts[3], Vec3 camNormals[3],
+    Vec3 cameraPos, Vec3 lightPos, Material material);
+void RenderTrianglePhong(GameBackbuffer* backbuffer,
+    Vec3Int verts[3], Vec3 camVerts[3], Vec2 uvs[3], Vec3 camNormals[3],
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     Vec3 cameraPos, Vec3 lightPos, Material material);
 
 Vec3 CalculatePhongColor(Vec3 vertex, Vec3 normal,

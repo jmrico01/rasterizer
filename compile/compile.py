@@ -147,6 +147,7 @@ def WinCompileRelease():
         "/EHa-",    # disable exception handling
         "/EHsc",    # handle stdlib errors
         "/Ox",      # full optimization
+        "/Z7"       # minimal "old school" debug information
     ])
     compilerWarningFlags = " ".join([
         "/WX",      # treat warnings as errors

@@ -105,6 +105,34 @@ void RenderOverwriteGrayscaleBitmapSection(
     }
 }
 
+void RenderOverwriteColorBitmap(
+    GameBackbuffer* backbuffer, Vec2Int pos,
+    Bitmap* bitmap)
+{
+    uint8* backbufferData = (uint8*)backbuffer->data;
+    int backbufferBytesPerRow = backbuffer->width * backbuffer->bytesPerPixel;
+
+    for (int j = 0; j < bitmap->height; j++) {
+        for (int i = 0; i < bitmap->width; i++) {
+            if (pos.x + i < 0 || pos.x + i >= backbuffer->width) {
+                continue;
+            }
+            if (pos.y + j < 0 || pos.y + j >= backbuffer->height) {
+                continue;
+            }
+            int backbufferOff = (pos.y + j) * backbufferBytesPerRow
+                + (pos.x + i) * backbuffer->bytesPerPixel;
+            int bitmapOff = j * bitmap->width * bitmap->bytesPerPixel
+                + i * bitmap->bytesPerPixel;
+            uint8 b = bitmap->data[bitmapOff];
+            uint8 g = bitmap->data[bitmapOff + 1];
+            uint8 r = bitmap->data[bitmapOff + 2];
+            uint32* pixel = (uint32*)(backbufferData + backbufferOff);
+            *pixel = (255 << 24) | (r << 16) | (g << 8) | b;
+        }
+    }
+}
+
 void RenderAddClampGrayscaleBitmapSection(
     GameBackbuffer* backbuffer, Vec2Int pos,
     const uint8* bitmap, int bitmapWidth, int bitmapHeight,
@@ -180,12 +208,6 @@ internal inline BoundingBox ComputeTriangleBoundingBox(Vec3Int triangle[3])
     return bb;
 }
 
-internal inline float32 ComputeTriangleSignedArea(Vec3Int triangle[3])
-{
-    return 0.5f * (
-        (triangle[1].x - triangle[0].x) * (triangle[2].y - triangle[0].y)
-        - (triangle[2].x - triangle[0].x) * (triangle[1].y - triangle[0].y));
-}
 internal inline float32 ComputeTriangleSignedArea(
     Vec3Int v0, Vec3Int v1, Vec3Int v2)
 {
@@ -194,16 +216,17 @@ internal inline float32 ComputeTriangleSignedArea(
         - (v2.x - v0.x) * (v1.y - v0.y));
 }
 
-internal Vec3 ComputeBarycentricCoords(Vec3Int triangle[3], Vec3Int p)
+internal inline Vec3 ComputeBarycentricCoords(Vec3Int triangle[3], Vec3Int p)
 {
     Vec3 result;
-    float32 area2 = 2.0f * ComputeTriangleSignedArea(triangle);
+    float32 area = ComputeTriangleSignedArea(
+        triangle[0], triangle[1], triangle[2]);
     result.x = ComputeTriangleSignedArea(triangle[0], triangle[1], p);
-    result.x /= area2;
+    result.x /= area;
     result.y = ComputeTriangleSignedArea(triangle[1], triangle[2], p);
-    result.y /= area2;
+    result.y /= area;
     result.z = ComputeTriangleSignedArea(triangle[2], triangle[0], p);
-    result.z /= area2;
+    result.z /= area;
     return result;
 }
 
@@ -219,7 +242,9 @@ void RenderTriangleFlat(GameBackbuffer* backbuffer,
     for (pix.x = bound.min.x; pix.x < bound.max.x; pix.x++) {
         for (pix.y = bound.min.y; pix.y < bound.max.y; pix.y++) {
             Vec3 bCoords = ComputeBarycentricCoords(verts, pix);
-            if (bCoords.x >= 0.0f && bCoords.y >= 0.0f && bCoords.z >= 0.0f) {
+            if (0.0f <= bCoords.x && bCoords.x <= 1.0f
+            && 0.0f <= bCoords.y && bCoords.y <= 1.0f
+            && 0.0f <= bCoords.z && bCoords.z <= 1.0f) {
                 pix.z = (int)(verts[2].z * bCoords.x
                     + verts[0].z * bCoords.y
                     + verts[1].z * bCoords.z);
@@ -242,7 +267,9 @@ void RenderTriangleGouraud(GameBackbuffer* backbuffer,
     for (pix.x = bound.min.x; pix.x < bound.max.x; pix.x++) {
         for (pix.y = bound.min.y; pix.y < bound.max.y; pix.y++) {
             Vec3 bCoords = ComputeBarycentricCoords(verts, pix);
-            if (bCoords.x >= 0.0f && bCoords.y >= 0.0f && bCoords.z >= 0.0f) {
+            if (0.0f <= bCoords.x && bCoords.x <= 1.0f
+            && 0.0f <= bCoords.y && bCoords.y <= 1.0f
+            && 0.0f <= bCoords.z && bCoords.z <= 1.0f) {
                 pix.z = (int)(verts[2].z * bCoords.x
                     + verts[0].z * bCoords.y
                     + verts[1].z * bCoords.z);
@@ -272,7 +299,9 @@ void RenderTrianglePhong(GameBackbuffer* backbuffer,
     for (pix.x = bound.min.x; pix.x < bound.max.x; pix.x++) {
         for (pix.y = bound.min.y; pix.y < bound.max.y; pix.y++) {
             Vec3 bCoords = ComputeBarycentricCoords(verts, pix);
-            if (bCoords.x >= 0.0f && bCoords.y >= 0.0f && bCoords.z >= 0.0f) {
+            if (0.0f <= bCoords.x && bCoords.x <= 1.0f
+            && 0.0f <= bCoords.y && bCoords.y <= 1.0f
+            && 0.0f <= bCoords.z && bCoords.z <= 1.0f) {
                 pix.z = (int)(verts[2].z * bCoords.x
                     + verts[0].z * bCoords.y
                     + verts[1].z * bCoords.z);
@@ -283,10 +312,69 @@ void RenderTrianglePhong(GameBackbuffer* backbuffer,
                 Vec3 normal = camNormals[2] * bCoords.x
                     + camNormals[0] * bCoords.y
                     + camNormals[1] * bCoords.z;
-                //debug
-                float32 mag = Mag(normal);
-                DEBUG_ASSERT(mag < 1.0f - 0.001f || mag > 1.0f + 0.001f);
-                //enddebug
+                Vec3 color = CalculatePhongColor(vert, normal,
+                    cameraPos, lightPos, material);
+                SetPixelColor(backbuffer, pix, color);
+            }
+        }
+    }
+}
+
+internal Vec3 SampleBitmap(const Bitmap* bitmap, Vec2 uv)
+{
+    int i = ClampInt((int)(uv.x * bitmap->width), 0, bitmap->width - 1);
+    int j = ClampInt((int)(uv.y * bitmap->height), 0, bitmap->height - 1);
+    int ind = j * bitmap->width * bitmap->bytesPerPixel
+        + i * bitmap->bytesPerPixel;
+    uint8 b = bitmap->data[ind];
+    uint8 g = bitmap->data[ind + 1];
+    uint8 r = bitmap->data[ind + 2];
+    return Vec3 {
+        (float32)r / 255.0f,
+        (float32)g / 255.0f,
+        (float32)b / 255.0f
+    };
+}
+
+void RenderTrianglePhong(GameBackbuffer* backbuffer,
+    Vec3Int verts[3], Vec3 camVerts[3], Vec2 uvs[3], Vec3 camNormals[3],
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    Vec3 cameraPos, Vec3 lightPos, Material material)
+{
+    BoundingBox bound = ComputeTriangleBoundingBox(verts);
+    bound.min.x = MaxInt(bound.min.x, 0);
+    bound.max.x = MinInt(bound.max.x, backbuffer->width - 1);
+    bound.min.y = MaxInt(bound.min.y, 0);
+    bound.max.y = MinInt(bound.max.y, backbuffer->height - 1);
+    Vec3Int pix;
+    for (pix.x = bound.min.x; pix.x < bound.max.x; pix.x++) {
+        for (pix.y = bound.min.y; pix.y < bound.max.y; pix.y++) {
+            Vec3 bCoords = ComputeBarycentricCoords(verts, pix);
+            if (0.0f <= bCoords.x && bCoords.x <= 1.0f
+            && 0.0f <= bCoords.y && bCoords.y <= 1.0f
+            && 0.0f <= bCoords.z && bCoords.z <= 1.0f) {
+                pix.z = (int)(verts[2].z * bCoords.x
+                    + verts[0].z * bCoords.y
+                    + verts[1].z * bCoords.z);
+                pix.z = ClampInt(pix.z, 0, INT_MAX);
+                Vec3 vert = camVerts[2] * bCoords.x
+                    + camVerts[0] * bCoords.y
+                    + camVerts[1] * bCoords.z;
+                Vec2 uv = uvs[2] * bCoords.x
+                    + uvs[0] * bCoords.y
+                    + uvs[1] * bCoords.z;
+                material.diffuse = SampleBitmap(diffuseMap, uv);
+                material.specular = SampleBitmap(specularMap, uv);
+                Vec3 normal;
+                if (normalMap == nullptr) {
+                    normal = camNormals[2] * bCoords.x
+                        + camNormals[0] * bCoords.y
+                        + camNormals[1] * bCoords.z;
+                }
+                else {
+                    normal = Normalize(SampleBitmap(normalMap, uv));
+                    normal *= 1.2f;
+                }
                 Vec3 color = CalculatePhongColor(vert, normal,
                     cameraPos, lightPos, material);
                 SetPixelColor(backbuffer, pix, color);
@@ -312,7 +400,11 @@ Vec3 CalculatePhongColor(Vec3 vertex, Vec3 normal,
     Vec3 view = Normalize(cameraPos - vertex);
     Vec3 reflected = -light - 2.0f * Dot(-light, normal) * normal;
     float32 dotVR = MaxFloat32(Dot(view, reflected), 0.0f);
-    color += material.specular * powf(dotVR, (float32)material.shininess);
+    float32 powDotVR = 1.0f;
+    for (int i = 0; i < material.shininess; i++) {
+        powDotVR *= dotVR;
+    }
+    color += material.specular * powDotVR;
 
     color.r = ClampFloat32(color.r, 0.0f, 1.0f);
     color.g = ClampFloat32(color.g, 0.0f, 1.0f);

@@ -2,6 +2,7 @@
 
 #include "km_lib.h"
 #include "km_math.h"
+#include "load_bmp.h"
 #include "main_platform.h"
 
 struct Material
@@ -42,6 +43,11 @@ void RenderMeshGouraud(const Mesh& mesh,
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     Vec3 cameraPos, Vec3 lightPos, Material material,
+    GameBackbuffer* backbuffer);
+void RenderMeshPhong(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     GameBackbuffer* backbuffer);
 
 void FreeMesh(Mesh* mesh);

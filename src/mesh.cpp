@@ -353,6 +353,9 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
                     start++;
                 }
                 Vec2 uv = ParseVec2(&line[start]);
+                // TODO: uvs are flipped vertically here
+                // BMPs should probably be flipped vertically instead
+                uv.y = 1.0f - uv.y;
                 uvs.Append(uv);
             }
             else if (line[1] == 'n') {
@@ -507,11 +510,25 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     return mesh;
 }
 
+internal bool IsCCW(Vec3Int triangle[3])
+{
+    Vec2 e01 = {
+        (float32)triangle[1].x - triangle[0].x,
+        (float32)triangle[1].y - triangle[0].y
+    };
+    Vec2 e02 = {
+        (float32)triangle[2].x - triangle[0].x,
+        (float32)triangle[2].y - triangle[0].y
+    };
+    e02 = { -e02.y, e02.x };
+    return Dot(e01, e02) <= 0.0f;
+}
+
 internal bool TriangleWorldToScreen(
     const Vec3 world[3], Mat4 mvp, Vec3Int screen[3],
     GameBackbuffer* backbuffer)
 {
-    bool insideScreen = false;
+    bool shouldRender = false;
     for (int i = 0; i < 3; i++) {
         Vec4 v4 = { world[i].x, world[i].y, world[i].z, 1.0f };
         v4 = mvp * v4;
@@ -529,11 +546,16 @@ internal bool TriangleWorldToScreen(
         && screen[i].x < backbuffer->width
         && 0 <= screen[i].y
         && screen[i].y < backbuffer->height) {
-            insideScreen = true;
+            shouldRender = true;
         }
     }
 
-    return insideScreen;
+    // TODO: include on/off setting
+    /*if (!IsCCW(screen)) {
+        return false;
+    }*/
+
+    return shouldRender;
 }
 
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
@@ -541,10 +563,10 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
 {
     Vec3Int triangleScreen[3];
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        bool insideScreen = TriangleWorldToScreen(
+        bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
-        if (insideScreen) {
+        if (shouldRender) {
             RenderTriangleWire(backbuffer, triangleScreen,
                 Vec3 { 1.0f, 0.0f, 0.0f });
         }
@@ -559,10 +581,10 @@ void RenderMeshFlat(const Mesh& mesh,
     Mat4 mvp = proj * view * model;
     Vec3Int triangleScreen[3];
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        bool insideScreen = TriangleWorldToScreen(
+        bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
-        if (insideScreen) {
+        if (shouldRender) {
             Vec3 centroid = (mesh.triangles[t].v[0]
                 + mesh.triangles[t].v[1]
                 + mesh.triangles[t].v[2]) / 3.0f;
@@ -587,10 +609,10 @@ void RenderMeshGouraud(const Mesh& mesh,
     Vec3Int triangleScreen[3];
     Vec3 vertColors[3];
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        bool insideScreen = TriangleWorldToScreen(
+        bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
-        if (insideScreen) {
+        if (shouldRender) {
             Vec3 vert, norm;
             for (int v = 0; v < 3; v++) {
                 vert = ToVec3(model * ToVec4(mesh.triangles[t].v[v], 1.0f));
@@ -603,6 +625,7 @@ void RenderMeshGouraud(const Mesh& mesh,
     }
 }
 
+
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     Vec3 cameraPos, Vec3 lightPos, Material material,
@@ -613,10 +636,10 @@ void RenderMeshPhong(const Mesh& mesh,
     Vec3 cameraVerts[3];
     Vec3 cameraNormals[3];
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        bool insideScreen = TriangleWorldToScreen(
+        bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
-        if (insideScreen) {
+        if (shouldRender) {
             for (int v = 0; v < 3; v++) {
                 cameraVerts[v] = ToVec3(model
                     * ToVec4(mesh.triangles[t].v[v], 1.0f));
@@ -625,6 +648,35 @@ void RenderMeshPhong(const Mesh& mesh,
             }
             RenderTrianglePhong(backbuffer, triangleScreen,
                 cameraVerts, cameraNormals,
+                cameraPos, lightPos, material);
+        }
+    }
+}
+
+void RenderMeshPhong(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    GameBackbuffer* backbuffer)
+{
+    Mat4 mvp = proj * view * model;
+    Vec3Int triangleScreen[3];
+    Vec3 cameraVerts[3];
+    Vec3 cameraNormals[3];
+    for (int t = 0; t < (int)mesh.triangles.size; t++) {
+        bool shouldRender = TriangleWorldToScreen(
+            mesh.triangles[t].v, mvp, triangleScreen,
+            backbuffer);
+        if (shouldRender) {
+            for (int v = 0; v < 3; v++) {
+                cameraVerts[v] = ToVec3(model
+                    * ToVec4(mesh.triangles[t].v[v], 1.0f));
+                cameraNormals[v] = ToVec3(model
+                    * ToVec4(mesh.triangles[t].n[v], 0.0f));
+            }
+            RenderTrianglePhong(backbuffer, triangleScreen,
+                cameraVerts, mesh.triangles[t].uv, cameraNormals,
+                diffuseMap, specularMap, normalMap,
                 cameraPos, lightPos, material);
         }
     }
