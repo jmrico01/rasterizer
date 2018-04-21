@@ -12,11 +12,17 @@ inline int MinInt(int a, int b) {
 inline int MaxInt(int a, int b) {
     return a > b ? a : b;
 }
+inline int ClampInt(int a, int min, int max) {
+    return MinInt(MaxInt(a, min), max);
+}
 inline float32 MinFloat32(float32 a, float32 b) {
     return a < b ? a : b;
 }
 inline float32 MaxFloat32(float32 a, float32 b) {
     return a > b ? a : b;
+}
+inline float32 ClampFloat32(float32 a, float32 min, float32 max) {
+    return MinFloat32(MaxFloat32(a, min), max);
 }
 // TODO: naive round implementation
 inline int RoundFloat32(float32 a) {
@@ -348,6 +354,11 @@ const Vec3 Vec3::unitZ = {
     0.0f, 0.0f, 1.0f
 };
 
+inline Vec3 ToVec3(Vec4 v)
+{
+    return Vec3 { v.x, v.y, v.z };
+}
+
 inline Vec3 operator-(Vec3 v)
 {
 	Vec3 result;
@@ -566,6 +577,16 @@ const Vec4 Vec4::blue = {
     0.0f, 0.0f, 1.0f, 1.0f
 };
 
+inline Vec4 ToVec4(Vec3 v, float32 w)
+{
+    Vec4 result;
+    result.x = v.x;
+    result.y = v.y;
+    result.z = v.z;
+    result.w = w;
+    return result;
+}
+
 inline Vec4 operator-(Vec4 v)
 {
 	Vec4 result;
@@ -643,11 +664,6 @@ inline Vec4& operator/=(Vec4& v, float32 s)
 inline bool operator==(const Vec4& v1, const Vec4& v2)
 {
     return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
-}
-
-inline Vec3 ToVec3(Vec4 v)
-{
-    return Vec3 { v.x, v.y, v.z };
 }
 
 // -------------------- Mat4 --------------------

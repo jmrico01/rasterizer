@@ -37,6 +37,11 @@ struct GameState
 
     Button shadeModeButtons[4];
 
+    InputField ambientFields[3];
+    InputField diffuseFields[3];
+    InputField specularFields[3];
+    InputField shininessField;
+
     Button addMeshFieldButton;
     DynamicArray<MeshField> meshFields;
 };

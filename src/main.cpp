@@ -74,6 +74,37 @@ internal void ChangeShadingModeCallback(Button* button, void* data)
     }
 }
 
+internal void ChangeMaterialCallback(InputField* inputField, void* data)
+{
+    GameState* gameState = (GameState*)data;
+
+    float32 floatVal = (float32)strtod(inputField->text, nullptr);
+    int intVal = (int)strtol(inputField->text, nullptr, 10);
+
+    for (int i = 0; i < 3; i++) {
+        if (inputField == &gameState->ambientFields[i]) {
+            gameState->globalMaterial.ambient.e[i] = floatVal;
+            return;
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        if (inputField == &gameState->diffuseFields[i]) {
+            gameState->globalMaterial.diffuse.e[i] = floatVal;
+            return;
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        if (inputField == &gameState->specularFields[i]) {
+            gameState->globalMaterial.specular.e[i] = floatVal;
+            return;
+        }
+    }
+    if (inputField == &gameState->shininessField) {
+        gameState->globalMaterial.shininess = intVal;
+        return;
+    }
+}
+
 internal void ChangeMeshFieldCallback(InputField* inputField, void* data)
 {
     ChangeMeshFieldData* cmfData = (ChangeMeshFieldData*)data;
@@ -98,7 +129,7 @@ internal void UpdateMeshFieldLayout(GameState* gameState,
 {
     Vec2Int size = {
         200,
-        (int)gameState->fontFaceSmall.height + UI_ITEM_SPACING
+        (int)gameState->fontFaceMedium.height + UI_ITEM_SPACING
     };
     Vec2Int origin = {
         backbuffer->width - UI_MARGIN - 200,
@@ -217,7 +248,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
         
         gameState->shadeMode = SHADEMODE_WIRE;
-        gameState->lightPos = Vec3 { 1.0f, 1.0f, -1.0f };
+        gameState->lightPos = Vec3 { 2.0f, 2.0f, 10.0f };
         gameState->globalMaterial.ambient = Vec3 { 0.0f, 0.0f, 0.0f };
         gameState->globalMaterial.diffuse = Vec3 { 1.0f, 1.0f, 1.0f };
         gameState->globalMaterial.specular = Vec3 { 1.0f, 1.0f, 1.0f };
@@ -228,20 +259,20 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             DEBUG_PRINT("FreeType init error: %d\n", error);
         }
         LoadFontFace(thread, gameState->library,
-            "data/fonts/computer-modern/serif.ttf", 18,
+            "data/fonts/computer-modern/serif.ttf", 14,
             memory->DEBUGPlatformReadFile, memory->DEBUGPlatformFreeFileMemory,
             &gameState->fontFaceSmall);
         LoadFontFace(thread, gameState->library,
-            "data/fonts/computer-modern/serif.ttf", 24,
+            "data/fonts/computer-modern/serif.ttf", 18,
             memory->DEBUGPlatformReadFile, memory->DEBUGPlatformFreeFileMemory,
             &gameState->fontFaceMedium);
         LoadFontFace(thread, gameState->library,
-            "data/fonts/computer-modern/serif.ttf", 36,
+            "data/fonts/computer-modern/serif.ttf", 24,
             memory->DEBUGPlatformReadFile, memory->DEBUGPlatformFreeFileMemory,
             &gameState->fontFaceLarge);
         
         Vec2Int shadeModeButtonsSize = {
-            200, (int)gameState->fontFaceSmall.height + UI_ITEM_SPACING
+            170, (int)gameState->fontFaceMedium.height + UI_ITEM_SPACING
         };
         Vec2Int shadeModeButtonsOrigin = {
             UI_MARGIN, UI_MARGIN
@@ -265,8 +296,70 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             );
         }
 
+        Vec2Int colorFieldsSize = {
+            80, (int)gameState->fontFaceSmall.height + UI_ITEM_SPACING
+        };
+        Vec2Int colorFieldsOrigin = {
+            shadeModeButtonsOrigin.x + shadeModeButtonsSize.x
+                + UI_ITEM_SPACING * 3,
+            UI_MARGIN
+        };
+        Vec2Int colorFieldsStride = {
+            colorFieldsSize.x + UI_ITEM_SPACING,
+            colorFieldsSize.y + (int)gameState->fontFaceSmall.height
+                + UI_ITEM_SPACING * 2
+        };
+        for (int i = 0; i < 3; i++) {
+            Vec2Int pos = colorFieldsOrigin;
+            pos.x += colorFieldsStride.x * i;
+            gameState->ambientFields[i] = CreateInputField(
+                pos, colorFieldsSize,
+                "0", &ChangeMaterialCallback,
+                Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
+                Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }
+            );
+        }
+        for (int i = 0; i < 3; i++) {
+            Vec2Int pos = colorFieldsOrigin;
+            pos.y += colorFieldsStride.y;
+            pos.x += colorFieldsStride.x * i;
+            gameState->diffuseFields[i] = CreateInputField(
+                pos, colorFieldsSize,
+                "1", &ChangeMaterialCallback,
+                Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
+                Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }
+            );
+        }
+        for (int i = 0; i < 3; i++) {
+            Vec2Int pos = colorFieldsOrigin;
+            pos.y += colorFieldsStride.y * 2;
+            pos.x += colorFieldsStride.x * i;
+            gameState->specularFields[i] = CreateInputField(
+                pos, colorFieldsSize,
+                "1", &ChangeMaterialCallback,
+                Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
+                Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
+                Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }
+            );
+        }
+        Vec2Int pos = colorFieldsOrigin;
+        pos.y += colorFieldsStride.y * 3;
+        gameState->shininessField = CreateInputField(
+            pos, colorFieldsSize,
+            "5", &ChangeMaterialCallback,
+            Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
+            Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
+            Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
+            Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }
+        );
+
         gameState->meshFields.Init();
-        AddMeshField(thread, gameState, "tetrahedron.obj", backbuffer,
+        AddMeshField(thread, gameState, "cheetah.obj", backbuffer,
             memory->DEBUGPlatformReadFile,
             memory->DEBUGPlatformFreeFileMemory);
         /*AddMeshField(thread, gameState, "afrhead.obj", backbuffer,
@@ -301,6 +394,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     gameState->cameraPos.z = DEFAULT_CAM_Z
         * powf(ZOOM_STEP, (float)input->mouseWheel);
     
+    // Update shade mode buttons
     for (int i = 0; i < 4; i++) {
         gameState->shadeModeButtons[i].box.color =
             Vec4 { 0.2f, 0.2f, 0.2f, 1.0f };
@@ -317,6 +411,12 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         Vec4 { 0.6f, 0.8f, 0.8f, 1.0f };
 
     UpdateButtons(gameState->shadeModeButtons, 4, input, (void*)gameState);
+
+    // Update material settings fields
+    UpdateInputFields(gameState->ambientFields, 3, input, (void*)gameState);
+    UpdateInputFields(gameState->diffuseFields, 3, input, (void*)gameState);
+    UpdateInputFields(gameState->specularFields, 3, input, (void*)gameState);
+    UpdateInputFields(&gameState->shininessField, 1, input, (void*)gameState);
 
     // Update model fields
     UpdateMeshFieldLayout(gameState, backbuffer);
@@ -338,52 +438,61 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 
     // Clear screen
     Vec3 clearColor = { 0.05f, 0.1f, 0.2f };
-    ClearBackbuffer(backbuffer, clearColor);
+    uint32 clearDepth = 0;
+    ClearBackbuffer(backbuffer, clearColor, clearDepth);
 
     // -------------------- 3D rendering --------------------
     Mat4 proj = Projection(110.0f,
         (float32)backbuffer->width / (float32)backbuffer->height,
         0.1f, 10.0f);
-    Mat4 view = Translate(-gameState->cameraPos)
-        * UnitQuatToMat4(gameState->modelRot);
-    
-    Mat4 mvp = proj * view;
+    Mat4 view = Translate(-gameState->cameraPos);
+    Mat4 model = UnitQuatToMat4(gameState->modelRot);
+    Mat4 mvp = proj * view * model;
 
-    switch (gameState->shadeMode) {
-        case SHADEMODE_WIRE: {
-            for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        switch (gameState->shadeMode) {
+            case SHADEMODE_WIRE: {
                 RenderMeshWire(gameState->meshFields[i].mesh, mvp, backbuffer);
-            }
-        } break;
-        case SHADEMODE_FLAT: {
-            for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+            } break;
+            case SHADEMODE_FLAT: {
                 RenderMeshFlat(gameState->meshFields[i].mesh,
-                    mvp, gameState->cameraPos, gameState->lightPos,
+                    model, view, proj,
+                    gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
                     backbuffer);
-            }
-        } break;
-        case SHADEMODE_GOURAUD: {
-        } break;
-        case SHADEMODE_PHONG: {
-        } break;
+            } break;
+            case SHADEMODE_GOURAUD: {
+                RenderMeshGouraud(gameState->meshFields[i].mesh,
+                    model, view, proj,
+                    gameState->cameraPos, gameState->lightPos,
+                    gameState->globalMaterial,
+                    backbuffer);
+            } break;
+            case SHADEMODE_PHONG: {
+                RenderMeshPhong(gameState->meshFields[i].mesh,
+                    model, view, proj,
+                    gameState->cameraPos, gameState->lightPos,
+                    gameState->globalMaterial,
+                    backbuffer);
+            } break;
 
-        default: {
-        } break;
+            default: {
+            } break;
+        }
     }
     // ------------------------------------------------------
 
-    RenderText(&gameState->fontFaceMedium, "Software Rasterizer",
+    RenderText(&gameState->fontFaceLarge, "Software Rasterizer",
         Vec2Int { UI_MARGIN, backbuffer->height - UI_MARGIN },
         Vec2 { 0.0f, 1.0f },
         Vec4 { 0.7f, 0.9f, 0.9f, 1.0f },
         backbuffer
     );
-    RenderText(&gameState->fontFaceSmall, "Jose M Rico <jrico>",
+    RenderText(&gameState->fontFaceLarge, "Jose M Rico <jrico>",
         Vec2Int {
             UI_MARGIN,
             backbuffer->height - UI_MARGIN
-                - (int)gameState->fontFaceMedium.height - UI_ITEM_SPACING
+                - (int)gameState->fontFaceLarge.height - UI_ITEM_SPACING
         },
         Vec2 { 0.0f, 1.0f },
         Vec4 { 0.7f, 0.9f, 0.9f, 1.0f },
@@ -395,11 +504,42 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     shadeModeTopPos.x += gameState->shadeModeButtons[3].box.size.x / 2;
     shadeModeTopPos.y += gameState->shadeModeButtons[3].box.size.y;
     shadeModeTopPos.y += UI_ITEM_SPACING;
-    RenderText(&gameState->fontFaceMedium, "Shading Mode",
+    RenderText(&gameState->fontFaceLarge, "Shading Mode",
         shadeModeTopPos, Vec2 { 0.5f, 0.0f },
         Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
         backbuffer);
     DrawButtons(gameState->shadeModeButtons, 4,
+        backbuffer, &gameState->fontFaceMedium);
+    
+    // Draw material settings fields
+    Vec2Int colorFieldsOffset = {
+        0, gameState->ambientFields[0].box.size.y + UI_ITEM_SPACING
+    };
+    Vec2Int topPos = gameState->ambientFields[0].box.origin + colorFieldsOffset;
+    RenderText(&gameState->fontFaceMedium, "Ambient",
+        topPos, Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }, 
+        backbuffer);
+    DrawInputFields(gameState->ambientFields, 3,
+        backbuffer, &gameState->fontFaceSmall);
+
+    topPos = gameState->diffuseFields[0].box.origin + colorFieldsOffset;
+    RenderText(&gameState->fontFaceMedium, "Diffuse",
+        topPos, Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }, backbuffer);
+    DrawInputFields(gameState->diffuseFields, 3,
+        backbuffer, &gameState->fontFaceSmall);
+
+    topPos = gameState->specularFields[0].box.origin + colorFieldsOffset;
+    RenderText(&gameState->fontFaceMedium, "Specular",
+        topPos, Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }, 
+        backbuffer);
+    DrawInputFields(gameState->specularFields, 3,
+        backbuffer, &gameState->fontFaceSmall);
+
+    topPos = gameState->shininessField.box.origin + colorFieldsOffset;
+    RenderText(&gameState->fontFaceMedium, "Shininess",
+        topPos, Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }, 
+        backbuffer);
+    DrawInputFields(&gameState->shininessField, 1,
         backbuffer, &gameState->fontFaceSmall);
     
     // Draw model fields
@@ -408,24 +548,24 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     meshFieldsTopPos.x += gameState->addMeshFieldButton.box.size.x / 2;
     meshFieldsTopPos.y += gameState->addMeshFieldButton.box.size.y;
     meshFieldsTopPos.y += UI_ITEM_SPACING;
-    RenderText(&gameState->fontFaceMedium, "Loaded Meshes",
+    RenderText(&gameState->fontFaceLarge, "Loaded Meshes",
         meshFieldsTopPos, Vec2 { 0.5f, 0.0f },
         Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
         backbuffer);
     DrawButtons(&gameState->addMeshFieldButton, 1,
-        backbuffer, &gameState->fontFaceSmall);
+        backbuffer, &gameState->fontFaceMedium);
     for (int i = 0; i < (int)gameState->meshFields.size; i++) {
         DrawInputFields(&gameState->meshFields[i].inputField, 1,
-            backbuffer, &gameState->fontFaceSmall);
+            backbuffer, &gameState->fontFaceMedium);
         DrawButtons(&gameState->meshFields[i].closeButton, 1,
-            backbuffer, &gameState->fontFaceSmall);
+            backbuffer, &gameState->fontFaceMedium);
     }
 
     // Screen resolution
     char resolutionString[512];
     sprintf(resolutionString, "Resolution: %d x %d",
         backbuffer->width, backbuffer->height);
-    RenderText(&gameState->fontFaceSmall, resolutionString,
+    RenderText(&gameState->fontFaceMedium, resolutionString,
         Vec2Int {
             backbuffer->width - UI_MARGIN,
             backbuffer->height - UI_MARGIN
@@ -438,11 +578,11 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     // FPS counter
     char fpsString[512];
     sprintf(fpsString, "FPS: %f", 1.0 / deltaTime);
-    RenderText(&gameState->fontFaceSmall, fpsString,
+    RenderText(&gameState->fontFaceMedium, fpsString,
         Vec2Int {
             backbuffer->width - UI_MARGIN,
             backbuffer->height - UI_MARGIN
-                - (int)gameState->fontFaceSmall.height - UI_ITEM_SPACING
+                - (int)gameState->fontFaceMedium.height - UI_ITEM_SPACING
         },
         Vec2 { 1.0f, 1.0f },
         Vec4 { 0.7f, 0.9f, 0.9f, 1.0f },

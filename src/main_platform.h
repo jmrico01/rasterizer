@@ -45,6 +45,9 @@ struct GameBackbuffer
     int width;
     int height;
     int bytesPerPixel;
+
+    // Depth buffer: 32 bits per pixel
+    uint32* depth;
 };
 
 struct GameButtonState

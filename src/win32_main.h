@@ -12,6 +12,8 @@ struct Win32Backbuffer
     int width;
     int height;
     int bytesPerPixel;
+
+    uint32* depth;
 };
 
 struct Win32WindowDimension

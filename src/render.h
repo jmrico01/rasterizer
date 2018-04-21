@@ -3,7 +3,7 @@
 #include "km_defines.h"
 #include "main_platform.h"
 
-void ClearBackbuffer(GameBackbuffer* backbuffer, Vec3 color);
+void ClearBackbuffer(GameBackbuffer* backbuffer, Vec3 color, uint32 depth);
 
 void RenderOverwriteRect(
     GameBackbuffer* backbuffer,
@@ -26,6 +26,11 @@ void RenderTriangleWire(GameBackbuffer* backbuffer,
     Vec3Int verts[3], Vec3 color);
 void RenderTriangleFlat(GameBackbuffer* backbuffer,
     Vec3Int verts[3], Vec3 color);
+void RenderTriangleGouraud(GameBackbuffer* backbuffer,
+    Vec3Int verts[3], Vec3 colors[3]);
+void RenderTrianglePhong(GameBackbuffer* backbuffer,
+    Vec3Int verts[3], Vec3 camVerts[3], Vec3 camNormals[3],
+    Vec3 cameraPos, Vec3 lightPos, Material material);
 
 Vec3 CalculatePhongColor(Vec3 vertex, Vec3 normal,
     Vec3 cameraPos, Vec3 lightPos, Material material);

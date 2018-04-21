@@ -15,7 +15,8 @@ struct Material
 struct Triangle
 {
     Vec3 v[3];
-    Vec3 normal;
+    Vec2 uv[3];
+    Vec3 n[3];
 };
 
 struct Mesh
@@ -31,7 +32,16 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer);
 void RenderMeshFlat(const Mesh& mesh,
-    Mat4 mvp, Vec3 cameraPos, Vec3 lightPos, Material material,
+    Mat4 model, Mat4 view, Mat4 proj,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    GameBackbuffer* backbuffer);
+void RenderMeshGouraud(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    GameBackbuffer* backbuffer);
+void RenderMeshPhong(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer);
 
 void FreeMesh(Mesh* mesh);

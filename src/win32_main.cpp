@@ -82,6 +82,7 @@ internal void Win32ResizeBackbuffer(Win32Backbuffer* buffer,
 {
     if (buffer->data) {
         VirtualFree(buffer->data, 0, MEM_RELEASE);
+        VirtualFree(buffer->depth, 0, MEM_RELEASE);
     }
 
     buffer->width = width;
@@ -101,7 +102,8 @@ internal void Win32ResizeBackbuffer(Win32Backbuffer* buffer,
 
     buffer->bytesPerPixel = bytesPerPixel;
 
-    // TODO: Probably clear this to black
+    buffer->depth = (uint32*)VirtualAlloc(0, bitmapMemorySize,
+        MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
 
 internal void Win32DisplayBufferInWindow(Win32Backbuffer* buffer,
@@ -780,6 +782,7 @@ int CALLBACK WinMain(
         gameBackbuffer.width = backbuffer_.width;
         gameBackbuffer.height = backbuffer_.height;
         gameBackbuffer.bytesPerPixel = backbuffer_.bytesPerPixel;
+        gameBackbuffer.depth = backbuffer_.depth;
         
         LARGE_INTEGER timerEnd;
         QueryPerformanceCounter(&timerEnd);
