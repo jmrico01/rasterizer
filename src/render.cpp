@@ -99,7 +99,8 @@ void RenderOverwriteGrayscaleBitmapSection(
 void RenderAddClampGrayscaleBitmapSection(
     GameBackbuffer* backbuffer, Vec2Int pos,
     const uint8* bitmap, int bitmapWidth, int bitmapHeight,
-    Vec2Int origin, int sectionWidth, int sectionHeight)
+    Vec2Int origin, int sectionWidth, int sectionHeight,
+    Vec4 colorMult)
 {
     uint8* backbufferData = (uint8*)backbuffer->data;
     int backbufferBytesPerRow = backbuffer->width * backbuffer->bytesPerPixel;
@@ -120,9 +121,9 @@ void RenderAddClampGrayscaleBitmapSection(
             uint8 r = (uint8)((*pixel >> 16) & 0xff);
             uint8 g = (uint8)((*pixel >> 8)  & 0xff);
             uint8 b = (uint8)((*pixel)       & 0xff);
-            r = (uint8)MinInt(gray + r, 255);
-            g = (uint8)MinInt(gray + g, 255);
-            b = (uint8)MinInt(gray + b, 255);
+            r = (uint8)MinInt((uint8)(gray * colorMult.r) + r, 255);
+            g = (uint8)MinInt((uint8)(gray * colorMult.g) + g, 255);
+            b = (uint8)MinInt((uint8)(gray * colorMult.b) + b, 255);
             *pixel = (255 << 24) | (r << 16) | (g << 8) | b;
         }
     }
@@ -150,6 +151,9 @@ void RenderTriangleWire(GameBackbuffer* backbuffer,
             if (0 <= pix.x && pix.x < backbuffer->width
             && 0 <= pix.y && pix.y < backbuffer->height) {
                 SetPixelColor(backbuffer, pix, color);
+            }
+            else {
+                break;
             }
         }
     }

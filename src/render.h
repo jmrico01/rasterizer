@@ -19,7 +19,8 @@ void RenderOverwriteGrayscaleBitmapSection(
 void RenderAddClampGrayscaleBitmapSection(
     GameBackbuffer* backbuffer, Vec2Int pos,
     const uint8* bitmap, int bitmapWidth, int bitmapHeight,
-    Vec2Int origin, int sectionWidth, int sectionHeight);
+    Vec2Int origin, int sectionWidth, int sectionHeight,
+    Vec4 colorMult);
 
 void RenderTriangleWire(GameBackbuffer* backbuffer,
     Vec2Int verts[3], Vec4 color);

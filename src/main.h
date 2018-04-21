@@ -4,13 +4,35 @@
 
 #include "gui.h"
 #include "text.h"
+#include "mesh.h"
+
+enum ShadeMode
+{
+    SHADEMODE_PHONG = 0,
+    SHADEMODE_GOURAUD,
+    SHADEMODE_FLAT,
+    SHADEMODE_WIRE
+};
+
+struct MeshField
+{
+    InputField input;
+};
 
 struct GameState
 {
-    FT_Library library;
-    FontFace fontFace;
+    Vec3 cameraPos;
+    Quat modelRot;
 
-    ClickableBox box;
-    InputField inputField;
-    Button button;
+    ShadeMode shadeMode;
+
+    FT_Library library;
+    FontFace fontFaceSmall;
+    FontFace fontFaceMedium;
+    FontFace fontFaceLarge;
+
+    Button shadeModeButtons[4];
+
+    DynamicArray<MeshField> meshFields;
+    Mesh cube;
 };

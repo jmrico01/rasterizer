@@ -305,7 +305,9 @@ DEBUG_PLATFORM_FREE_FILE_MEMORY_FUNC(DEBUGPlatformFreeFileMemory)
 
 DEBUG_PLATFORM_READ_FILE_FUNC(DEBUGPlatformReadFile)
 {
-	DEBUGReadFileResult result = {};
+	DEBUGReadFileResult result;
+    result.data = nullptr;
+    result.size = 0;
     
     char fullPath[MAX_PATH];
     CatStrings(StringLength(pathToApp_), pathToApp_,
@@ -556,6 +558,10 @@ internal void Win32ProcessMessages(HWND hWnd, GameInput* gameInput)
             gameInput->mouseButtons[1].transitions = 1;
         } break;
 
+        case WM_MOUSEWHEEL: {
+            gameInput->mouseWheel += GET_WHEEL_DELTA_WPARAM(msg.wParam);
+        } break;
+
 		default: {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -578,6 +584,9 @@ internal void Win32ClearInput(GameInput* input, GameInput* inputPrev)
 
     input->keyboardString[0] = '\0';
     input->keyboardStringLen = 0;
+
+    input->mousePos = inputPrev->mousePos;
+    input->mouseWheel = inputPrev->mouseWheel;
 }
 
 internal HWND Win32CreateWindow(
@@ -746,9 +755,10 @@ int CALLBACK WinMain(
 		POINT mousePos;
 		GetCursorPos(&mousePos);
 		ScreenToClient(hWnd, &mousePos);
+        Vec2Int mousePosPrev = newInput->mousePos;
         newInput->mousePos.x = mousePos.x;
 		newInput->mousePos.y = backbuffer_.height - mousePos.y;
-		newInput->mouseWheel = 0;
+        newInput->mouseDelta = newInput->mousePos - mousePosPrev;
         if (mousePos.x < 0 || mousePos.x > backbuffer_.width
         || mousePos.y < 0 || mousePos.y > backbuffer_.height) {
             for (int i = 0; i < 5; i++) {

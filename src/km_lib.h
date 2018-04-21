@@ -1,5 +1,7 @@
 #pragma once
 
+#include "km_debug.h"
+
 template <typename T>
 struct DynamicArray
 {
@@ -18,7 +20,10 @@ struct DynamicArray
     void Free();
 
     // TODO make inline
-    T& operator[](int index) const {
+    inline T& operator[](int index) const {
+#if GAME_SLOW
+        DEBUG_ASSERT(0 <= index && index < (int)size);
+#endif
         return data[index];
     }
 };

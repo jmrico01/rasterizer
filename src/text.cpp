@@ -160,7 +160,9 @@ void RenderText(const FontFace* face, const char* text,
         RenderAddClampGrayscaleBitmapSection(backbuffer, glyphPos,
             face->atlasData, face->atlasWidth, face->atlasHeight,
             glyphInfo.atlasCoords,
-            glyphInfo.width, glyphInfo.height);
+            glyphInfo.width, glyphInfo.height,
+            color
+        );
 
         i += glyphInfo.advanceX / 64;
         j += glyphInfo.advanceY / 64;

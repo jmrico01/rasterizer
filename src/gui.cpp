@@ -130,40 +130,41 @@ void UpdateInputFields(InputField fields[], uint32 n, GameInput* input)
         
         if (fields[i].box.pressed) {
             // TODO picks the last one for now. sort based on Z?
-            //printf("new input focus: %d\n", i);
+            //DEBUG_PRINT("new input focus: %d\n", i);
             focus[fieldsID] = i;
             anyPressed = true;
         }
     }
 
     if (focus[fieldsID] != -1 && input->mouseButtons[0].isDown && !anyPressed) {
-        //printf("lost focus\n");
+        //DEBUG_PRINT("lost focus\n");
         focus[fieldsID] = -1;
     }
 
     // TODO mysterious bug: can't type in more than 16 characters...
     if (focus[fieldsID] != -1 && input->keyboardStringLen != 0) {
-        //printf("size: %d\n", (int)sizeof(fields[focus]));
+        //DEBUG_PRINT("size: %d\n", (int)sizeof(fields[focus]));
         for (uint32 i = 0; i < input->keyboardStringLen; i++) {
             if (input->keyboardString[i] == 8) {
-                //printf(">> backspaced\n");
+                //DEBUG_PRINT(">> backspaced\n");
                 if (fields[focus[fieldsID]].textLen > 0) {
                     fields[focus[fieldsID]].textLen--;
                 }
             }
             else if (fields[focus[fieldsID]].textLen < INPUT_BUFFER_SIZE - 1) {
-                //printf("added %c\n", input->keyboardString[i].ascii);
-                //printf("textLen before: %d\n", fields[focus].textLen);
+                //DEBUG_PRINT("added %c\n", input->keyboardString[i].ascii);
+                //DEBUG_PRINT("textLen before: %d\n", fields[focus].textLen);
                 fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen++]
                     = input->keyboardString[i];
             }
         }
         fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen] = '\0';
-        //printf("new focus (%d) length: %d\n", focus, fields[focus].textLen);
+        //DEBUG_PRINT("new focus (%d) length: %d\n",
+        //    focus, fields[focus].textLen);
         for (uint32 i = 0; i < fields[focus[fieldsID]].textLen; i++) {
-            //printf("chardump: %c\n", fields[focus].text[i]);
+            //DEBUG_PRINT("chardump: %c\n", fields[focus].text[i]);
         }
-        //printf("new text: %s\n", fields[focus].text);
+        //DEBUG_PRINT("new text: %s\n", fields[focus].text);
     }
 }
 
