@@ -18,7 +18,41 @@
 #define UI_MARGIN 20
 #define UI_ITEM_SPACING 6
 
-void ChangeShadingMode(Button* button, void* data)
+struct ChangeMeshFieldData
+{
+    ThreadContext* thread;
+    GameState* gameState;
+    GameBackbuffer* backbuffer;
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile;
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory;
+};
+
+internal int StringLength(const char* string)
+{
+	int length = 0;
+	while (*string++) {
+		length++;
+    }
+
+	return length;
+}
+internal void CatStrings(
+	size_t sourceACount, const char* sourceA,
+	size_t sourceBCount, const char* sourceB,
+	size_t destCount, char* dest)
+{
+	for (size_t i = 0; i < sourceACount; i++) {
+		*dest++ = *sourceA++;
+    }
+
+	for (size_t i = 0; i < sourceBCount; i++) {
+		*dest++ = *sourceB++;
+    }
+
+	*dest++ = '\0';
+}
+
+internal void ChangeShadingModeCallback(Button* button, void* data)
 {
     GameState* gameState = (GameState*)data;
 
@@ -38,6 +72,130 @@ void ChangeShadingMode(Button* button, void* data)
         DEBUG_PRINT("Changed shading mode to Phong\n");
         gameState->shadeMode = SHADEMODE_PHONG;
     }
+}
+
+internal void ChangeMeshFieldCallback(InputField* inputField, void* data)
+{
+    ChangeMeshFieldData* cmfData = (ChangeMeshFieldData*)data;
+    GameState* gameState = cmfData->gameState;
+
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        if (&gameState->meshFields[i].inputField == inputField) {
+            char modelPath[256];
+            sprintf(modelPath, "data/models/%s", inputField->text);
+            FreeMesh(&gameState->meshFields[i].mesh);
+            gameState->meshFields[i].mesh = LoadMeshFromObj(cmfData->thread,
+                modelPath,
+                cmfData->DEBUGPlatformReadFile,
+                cmfData->DEBUGPlatformFreeFileMemory
+            );
+        }
+    }
+}
+
+internal void UpdateMeshFieldLayout(GameState* gameState,
+    GameBackbuffer* backbuffer)
+{
+    Vec2Int size = {
+        200,
+        (int)gameState->fontFaceSmall.height + UI_ITEM_SPACING
+    };
+    Vec2Int origin = {
+        backbuffer->width - UI_MARGIN - 200,
+        UI_MARGIN
+    };
+    Vec2Int stride = {
+        0, size.y + UI_ITEM_SPACING
+    };
+    Vec2Int closeButtonOffset = {
+        -(size.y + UI_ITEM_SPACING), 0
+    };
+    Vec2Int closeButtonSize = {
+        size.y, size.y
+    };
+
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        Vec2Int pos = origin + stride * i;
+        gameState->meshFields[i].inputField.box.origin = pos;
+        gameState->meshFields[i].inputField.box.size = size;
+
+        gameState->meshFields[i].closeButton.box.origin =
+            pos + closeButtonOffset;
+        gameState->meshFields[i].closeButton.box.size = closeButtonSize;
+    }
+    
+    MeshField topMeshField = gameState->meshFields[
+        gameState->meshFields.size - 1];
+    Vec2Int meshFieldsTopPos = topMeshField.inputField.box.origin;
+    meshFieldsTopPos += stride;
+    gameState->addMeshFieldButton.box.origin = meshFieldsTopPos;
+    gameState->addMeshFieldButton.box.size = size;
+}
+
+internal void RemoveMeshFieldCallback(Button* button, void* data)
+{
+    ChangeMeshFieldData* cmfData = (ChangeMeshFieldData*)data;
+    GameState* gameState = cmfData->gameState;
+
+    if (gameState->meshFields.size == 1) {
+        return;
+    }
+
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        if (&gameState->meshFields[i].closeButton == button) {
+            FreeMesh(&gameState->meshFields[i].mesh);
+            gameState->meshFields.Remove(i);
+        }
+    }
+    
+    UpdateMeshFieldLayout(gameState, cmfData->backbuffer);
+}
+
+internal void AddMeshField(ThreadContext* thread,
+    GameState* gameState,
+    const char* modelName, GameBackbuffer* backbuffer,
+    DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
+    DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
+{
+    Vec4 fieldColor = { 0.4f, 0.4f, 0.4f, 1.0f };
+    Vec4 hoverColor = { 0.6f, 0.6f, 0.6f, 1.0f };
+    Vec4 pressColor = { 0.9f, 0.9f, 0.9f, 1.0f };
+    Vec4 textColor = { 0.9f, 0.9f, 0.9f, 1.0f };
+
+    char modelPath[256];
+    sprintf(modelPath, "data/models/%s", modelName);
+
+    MeshField meshField;
+    meshField.mesh = LoadMeshFromObj(thread, modelPath,
+        DEBUGPlatformReadFile,
+        DEBUGPlatformFreeFileMemory
+    );
+    meshField.inputField = CreateInputField(
+        Vec2Int::zero, Vec2Int::zero,
+        modelName, &ChangeMeshFieldCallback,
+        fieldColor, hoverColor, pressColor, textColor
+    );
+    meshField.closeButton = CreateButton(
+        Vec2Int::zero, Vec2Int::zero,
+        "X", &RemoveMeshFieldCallback,
+        Vec4 { 0.2f, 0.2f, 0.2f, 1.0f },
+        Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
+        Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
+        Vec4 { 0.8f, 0.3f, 0.3f, 1.0f }
+    );
+
+    gameState->meshFields.Append(meshField);
+}
+
+internal void AddMeshFieldButtonCallback(Button* button, void* data)
+{
+    ChangeMeshFieldData* cmfData = (ChangeMeshFieldData*)data;
+    GameState* gameState = cmfData->gameState;
+
+    AddMeshField(cmfData->thread, gameState, "cube.obj", cmfData->backbuffer,
+        cmfData->DEBUGPlatformReadFile,
+        cmfData->DEBUGPlatformFreeFileMemory);
+    UpdateMeshFieldLayout(gameState, cmfData->backbuffer);
 }
 
 extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
@@ -94,7 +252,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             gameState->shadeModeButtons[i] = CreateButton(
                 pos, shadeModeButtonsSize,
                 shadeModeButtonNames[i],
-                &ChangeShadingMode,
+                &ChangeShadingModeCallback,
                 Vec4 { 0.4f, 0.4f, 0.4f, 1.0f },
                 Vec4 { 0.6f, 0.6f, 0.6f, 1.0f },
                 Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
@@ -102,9 +260,23 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             );
         }
 
-        gameState->cube = LoadMeshFromObj(thread, "data/models/teapot.obj",
+        gameState->meshFields.Init();
+        AddMeshField(thread, gameState, "afrhead.obj", backbuffer,
             memory->DEBUGPlatformReadFile,
             memory->DEBUGPlatformFreeFileMemory);
+        AddMeshField(thread, gameState, "afreye.obj", backbuffer,
+            memory->DEBUGPlatformReadFile,
+            memory->DEBUGPlatformFreeFileMemory);
+        gameState->addMeshFieldButton = CreateButton(
+            Vec2Int::zero, Vec2Int::zero,
+            "Add Mesh",
+            &AddMeshFieldButtonCallback,
+            Vec4 { 0.2f, 0.4f, 0.4f, 1.0f },
+            Vec4 { 0.4f, 0.6f, 0.6f, 1.0f },
+            Vec4 { 0.6f, 0.8f, 0.8f, 1.0f },
+            Vec4 { 0.9f, 0.9f, 0.9f, 1.0f }
+        );
+        UpdateMeshFieldLayout(gameState, backbuffer);
 
 		memory->isInitialized = true;
 	}
@@ -138,6 +310,22 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 
     UpdateButtons(gameState->shadeModeButtons, 4, input, (void*)gameState);
 
+    // Update model fields
+    ChangeMeshFieldData cmfData;
+    cmfData.thread = thread;
+    cmfData.gameState = gameState;
+    cmfData.backbuffer = backbuffer;
+    cmfData.DEBUGPlatformReadFile = memory->DEBUGPlatformReadFile;
+    cmfData.DEBUGPlatformFreeFileMemory = memory->DEBUGPlatformFreeFileMemory;
+    UpdateButtons(&gameState->addMeshFieldButton, 1,
+        input, (void*)&cmfData);
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        UpdateInputFields(&gameState->meshFields[i].inputField, 1,
+            input, (void*)&cmfData);
+        UpdateButtons(&gameState->meshFields[i].closeButton, 1,
+            input, (void*)&cmfData);
+    }
+
     // Clear screen
     Vec4 clearColor = { 0.05f, 0.1f, 0.2f, 1.0f };
     ClearBackbuffer(backbuffer, clearColor);
@@ -153,7 +341,9 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
 
     switch (gameState->shadeMode) {
         case SHADEMODE_WIRE: {
-            RenderMeshWire(gameState->cube, mvp, backbuffer);
+            for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+                RenderMeshWire(gameState->meshFields[i].mesh, mvp, backbuffer);
+            }
         } break;
         case SHADEMODE_FLAT: {
         } break;
@@ -185,16 +375,35 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     );
 
     // Draw shading mode buttons
-    Vec2Int topPos = gameState->shadeModeButtons[3].box.origin;
-    topPos.x += gameState->shadeModeButtons[3].box.size.x / 2;
-    topPos.y += gameState->shadeModeButtons[3].box.size.y;
-    topPos.y += UI_ITEM_SPACING;
+    Vec2Int shadeModeTopPos = gameState->shadeModeButtons[3].box.origin;
+    shadeModeTopPos.x += gameState->shadeModeButtons[3].box.size.x / 2;
+    shadeModeTopPos.y += gameState->shadeModeButtons[3].box.size.y;
+    shadeModeTopPos.y += UI_ITEM_SPACING;
     RenderText(&gameState->fontFaceMedium, "Shading Mode",
-        topPos, Vec2 { 0.5f, 0.0f },
+        shadeModeTopPos, Vec2 { 0.5f, 0.0f },
         Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
         backbuffer);
     DrawButtons(gameState->shadeModeButtons, 4,
         backbuffer, &gameState->fontFaceSmall);
+    
+    // Draw model fields
+    DEBUG_ASSERT(gameState->meshFields.size > 0);
+    Vec2Int meshFieldsTopPos = gameState->addMeshFieldButton.box.origin;
+    meshFieldsTopPos.x += gameState->addMeshFieldButton.box.size.x / 2;
+    meshFieldsTopPos.y += gameState->addMeshFieldButton.box.size.y;
+    meshFieldsTopPos.y += UI_ITEM_SPACING;
+    RenderText(&gameState->fontFaceMedium, "Loaded Meshes",
+        meshFieldsTopPos, Vec2 { 0.5f, 0.0f },
+        Vec4 { 0.9f, 0.9f, 0.9f, 1.0f },
+        backbuffer);
+    DrawButtons(&gameState->addMeshFieldButton, 1,
+        backbuffer, &gameState->fontFaceSmall);
+    for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        DrawInputFields(&gameState->meshFields[i].inputField, 1,
+            backbuffer, &gameState->fontFaceSmall);
+        DrawButtons(&gameState->meshFields[i].closeButton, 1,
+            backbuffer, &gameState->fontFaceSmall);
+    }
 
     // Screen resolution
     char resolutionString[512];

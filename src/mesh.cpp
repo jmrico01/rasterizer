@@ -47,6 +47,7 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory)
 {
     Mesh mesh;
+    mesh.triangles.Init();
 
     DEBUGReadFileResult objFile = DEBUGPlatformReadFile(thread, fileName);
     if (!objFile.data) {
@@ -58,7 +59,9 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     int read;
     char line[OBJ_LINE_MAX];
     DynamicArray<Vec3> vertices;
+    vertices.Init();
     DynamicArray<int> faceInds;
+    faceInds.Init();
 
     while ((read = GetNextLine(fileStr, line, OBJ_LINE_MAX)) >= 0) {
         fileStr += read + 1;
@@ -100,6 +103,7 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     }
 
     DynamicArray<int> face;
+    face.Init();
     for (int i = 0; i < (int)faceInds.size; i++) {
         if (faceInds[i] == -1) {
             if (face.size < 3) {
@@ -173,6 +177,11 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
                 Vec4 { 1.0f, 0.0f, 0.0f, 1.0f });
         }
     }
+}
+
+void FreeMesh(Mesh* mesh)
+{
+    mesh->triangles.Free();
 }
 
 /*HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh& mesh)

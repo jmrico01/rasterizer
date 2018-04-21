@@ -16,7 +16,9 @@ enum ShadeMode
 
 struct MeshField
 {
-    InputField input;
+    Mesh mesh;
+    InputField inputField;
+    Button closeButton;
 };
 
 struct GameState
@@ -33,6 +35,6 @@ struct GameState
 
     Button shadeModeButtons[4];
 
+    Button addMeshFieldButton;
     DynamicArray<MeshField> meshFields;
-    Mesh cube;
 };

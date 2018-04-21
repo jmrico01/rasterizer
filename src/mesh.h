@@ -23,6 +23,8 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer);
 
+void FreeMesh(Mesh* mesh);
+
 /*HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName);
 HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh& mesh);
 void FreeHalfEdgeMesh(HalfEdgeMesh* mesh);

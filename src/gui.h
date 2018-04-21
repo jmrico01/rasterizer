@@ -6,7 +6,9 @@
 #define INPUT_BUFFER_SIZE 2048
 
 struct Button;
+struct InputField;
 typedef void (*ButtonCallback)(Button*, void*);
+typedef void (*InputFieldCallback)(InputField*, void*);
 
 struct ClickableBox
 {
@@ -34,6 +36,7 @@ struct InputField
     ClickableBox box;
     char text[INPUT_BUFFER_SIZE];
     uint32 textLen;
+    InputFieldCallback callback;
     Vec4 textColor;
 };
 
@@ -42,7 +45,8 @@ ClickableBox CreateClickableBox(Vec2Int origin, Vec2Int size,
 Button CreateButton(Vec2Int origin, Vec2Int size,
     const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
-InputField CreateInputField(Vec2Int origin, Vec2Int size, const char* text,
+InputField CreateInputField(Vec2Int origin, Vec2Int size,
+    const char* text, InputFieldCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
 
 void UpdateClickableBoxes(ClickableBox boxes[], uint32 n, GameInput* input);
@@ -53,6 +57,7 @@ void UpdateButtons(Button buttons[], uint32 n, GameInput* input, void* data);
 void DrawButtons(Button buttons[], uint32 n,
     GameBackbuffer* backbuffer, const FontFace* face);
 
-void UpdateInputFields(InputField fields[], uint32 n, GameInput* input);
+void UpdateInputFields(InputField fields[], uint32 n,
+    GameInput* input, void* data);
 void DrawInputFields(InputField fields[], uint32 n,
     GameBackbuffer* backbuffer, const FontFace* face);

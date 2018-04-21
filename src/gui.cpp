@@ -37,7 +37,8 @@ Button CreateButton(Vec2Int origin, Vec2Int size,
     return button;
 }
 
-InputField CreateInputField(Vec2Int origin, Vec2Int size, const char* text,
+InputField CreateInputField(Vec2Int origin, Vec2Int size,
+    const char* text, InputFieldCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     InputField inputField = {};
@@ -47,6 +48,8 @@ InputField CreateInputField(Vec2Int origin, Vec2Int size, const char* text,
     inputField.textLen = (uint32)strnlen(text, INPUT_BUFFER_SIZE - 1);
     strncpy(inputField.text, text, inputField.textLen);
     inputField.text[inputField.textLen] = '\0';
+
+    inputField.callback = callback;
 
     inputField.textColor = textColor;
 
@@ -115,7 +118,8 @@ void DrawButtons(Button buttons[], uint32 n,
     }
 }
 
-void UpdateInputFields(InputField fields[], uint32 n, GameInput* input)
+void UpdateInputFields(InputField fields[], uint32 n,
+    GameInput* input, void* data)
 {
     // TODO: this is horribly hacky
     static std::map<uint64, int> focus;
@@ -150,6 +154,11 @@ void UpdateInputFields(InputField fields[], uint32 n, GameInput* input)
                 if (fields[focus[fieldsID]].textLen > 0) {
                     fields[focus[fieldsID]].textLen--;
                 }
+            }
+            else if (input->keyboardString[i] == 13) {
+                //DEBUG_PRINT(">> CR (enter, at last in Windows)\n");
+                fields[focus[fieldsID]].callback(&fields[focus[fieldsID]],
+                    data);
             }
             else if (fields[focus[fieldsID]].textLen < INPUT_BUFFER_SIZE - 1) {
                 //DEBUG_PRINT("added %c\n", input->keyboardString[i].ascii);

@@ -6,11 +6,15 @@ template <typename T>
 struct DynamicArray
 {
     uint32 size;
+#if GAME_SLOW
+    uint32 capacity = 0;
+#else
     uint32 capacity;
+#endif
     T* data;
 
-    DynamicArray();
-    DynamicArray(uint32 capacity);
+    void Init();
+    void Init(uint32 cap);
 
     DynamicArray<T> Copy() const;
     void Append(T element);
