@@ -161,7 +161,7 @@ void RenderText(const FontFace* face, const char* text,
             face->atlasData, face->atlasWidth, face->atlasHeight,
             glyphInfo.atlasCoords,
             glyphInfo.width, glyphInfo.height,
-            color
+            ToVec3(color)
         );
 
         i += glyphInfo.advanceX / 64;

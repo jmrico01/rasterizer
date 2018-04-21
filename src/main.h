@@ -27,6 +27,8 @@ struct GameState
     Quat modelRot;
 
     ShadeMode shadeMode;
+    Vec3 lightPos;
+    Material globalMaterial;
 
     FT_Library library;
     FontFace fontFaceSmall;

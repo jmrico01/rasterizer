@@ -4,6 +4,14 @@
 #include "km_math.h"
 #include "main_platform.h"
 
+struct Material
+{
+    Vec3 ambient;
+    Vec3 diffuse;
+    Vec3 specular;
+    int shininess;
+};
+
 struct Triangle
 {
     Vec3 v[3];
@@ -22,7 +30,8 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
 
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer);
-void RenderMeshFlat(const Mesh& mesh, Mat4 mvp,
+void RenderMeshFlat(const Mesh& mesh,
+    Mat4 mvp, Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer);
 
 void FreeMesh(Mesh* mesh);

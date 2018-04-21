@@ -12,7 +12,7 @@
 #include "text.h"
 #include "mesh.h"
 
-#define DEFAULT_CAM_Z 2.0f
+#define DEFAULT_CAM_Z 3.0f
 #define ZOOM_STEP 0.999f
 
 #define UI_MARGIN 20
@@ -217,6 +217,11 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
         
         gameState->shadeMode = SHADEMODE_WIRE;
+        gameState->lightPos = Vec3 { 1.0f, 1.0f, -1.0f };
+        gameState->globalMaterial.ambient = Vec3 { 0.0f, 0.0f, 0.0f };
+        gameState->globalMaterial.diffuse = Vec3 { 1.0f, 1.0f, 1.0f };
+        gameState->globalMaterial.specular = Vec3 { 1.0f, 1.0f, 1.0f };
+        gameState->globalMaterial.shininess = 5;
         
         FT_Error error = FT_Init_FreeType(&gameState->library);
         if (error) {
@@ -261,12 +266,15 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         }
 
         gameState->meshFields.Init();
-        AddMeshField(thread, gameState, "afrhead.obj", backbuffer,
+        AddMeshField(thread, gameState, "tetrahedron.obj", backbuffer,
+            memory->DEBUGPlatformReadFile,
+            memory->DEBUGPlatformFreeFileMemory);
+        /*AddMeshField(thread, gameState, "afrhead.obj", backbuffer,
             memory->DEBUGPlatformReadFile,
             memory->DEBUGPlatformFreeFileMemory);
         AddMeshField(thread, gameState, "afreye.obj", backbuffer,
             memory->DEBUGPlatformReadFile,
-            memory->DEBUGPlatformFreeFileMemory);
+            memory->DEBUGPlatformFreeFileMemory);*/
         gameState->addMeshFieldButton = CreateButton(
             Vec2Int::zero, Vec2Int::zero,
             "Add Mesh",
@@ -329,7 +337,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     }
 
     // Clear screen
-    Vec4 clearColor = { 0.05f, 0.1f, 0.2f, 1.0f };
+    Vec3 clearColor = { 0.05f, 0.1f, 0.2f };
     ClearBackbuffer(backbuffer, clearColor);
 
     // -------------------- 3D rendering --------------------
@@ -349,7 +357,10 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         } break;
         case SHADEMODE_FLAT: {
             for (int i = 0; i < (int)gameState->meshFields.size; i++) {
-                RenderMeshFlat(gameState->meshFields[i].mesh, mvp, backbuffer);
+                RenderMeshFlat(gameState->meshFields[i].mesh,
+                    mvp, gameState->cameraPos, gameState->lightPos,
+                    gameState->globalMaterial,
+                    backbuffer);
             }
         } break;
         case SHADEMODE_GOURAUD: {

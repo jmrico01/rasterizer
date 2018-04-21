@@ -82,12 +82,12 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n,
     GameBackbuffer* backbuffer)
 {
     for (uint32 i = 0; i < n; i++) {
-        Vec4 color = boxes[i].color;
+        Vec3 color = ToVec3(boxes[i].color);
         if (boxes[i].hovered) {
-            color = boxes[i].hoverColor;
+            color = ToVec3(boxes[i].hoverColor);
         }
         if (boxes[i].pressed) {
-            color = boxes[i].pressColor;
+            color = ToVec3(boxes[i].pressColor);
         }
         RenderOverwriteRect(backbuffer, boxes[i].origin, boxes[i].size, color);
     }

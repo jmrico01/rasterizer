@@ -12,6 +12,12 @@ inline int MinInt(int a, int b) {
 inline int MaxInt(int a, int b) {
     return a > b ? a : b;
 }
+inline float32 MinFloat32(float32 a, float32 b) {
+    return a < b ? a : b;
+}
+inline float32 MaxFloat32(float32 a, float32 b) {
+    return a > b ? a : b;
+}
 // TODO: naive round implementation
 inline int RoundFloat32(float32 a) {
     if (a < 0.0) {
@@ -66,6 +72,17 @@ union Vec3
 		float32 r, g, b;
     };
 	float32 e[3];
+};
+
+union Vec3Int
+{
+    const static Vec3Int zero;
+
+    struct
+    {
+        int x, y, z;
+    };
+    int e[3];
 };
 
 union Vec4
@@ -441,6 +458,94 @@ inline Vec3 Normalize(Vec3 v)
 	return v / Mag(v);
 }
 
+// ------------------ Vec3Int -------------------
+const Vec3Int Vec3Int::zero = {
+    0, 0, 0
+};
+
+inline Vec3Int operator-(Vec3Int v)
+{
+	Vec3Int result;
+	result.x = -v.x;
+	result.y = -v.y;
+	result.z = -v.z;
+	return result;
+}
+
+inline Vec3Int operator+(Vec3Int v1, Vec3Int v2)
+{
+	Vec3Int result;
+	result.x = v1.x + v2.x;
+	result.y = v1.y + v2.y;
+	result.z = v1.z + v2.z;
+	return result;
+}
+inline Vec3Int& operator+=(Vec3Int& v1, Vec3Int v2)
+{
+	v1 = v1 + v2;
+	return v1;
+}
+
+inline Vec3Int operator-(Vec3Int v1, Vec3Int v2)
+{
+	Vec3Int result;
+	result.x = v1.x - v2.x;
+	result.y = v1.y - v2.y;
+	result.z = v1.z - v2.z;
+	return result;
+}
+inline Vec3Int& operator-=(Vec3Int& v1, Vec3Int v2)
+{
+	v1 = v1 - v2;
+	return v1;
+}
+
+inline Vec3Int operator*(int s, Vec3Int v)
+{
+	Vec3Int result;
+	result.x = s * v.x;
+	result.y = s * v.y;
+	result.z = s * v.z;
+	return result;
+}
+inline Vec3Int operator*(Vec3Int v, int s)
+{
+	return s * v;
+}
+inline Vec3Int& operator*=(Vec3Int& v, int s)
+{
+	v = s * v;
+	return v;
+}
+
+inline Vec3Int operator/(Vec3Int v, int s)
+{
+	Vec3Int result;
+	result.x = v.x / s;
+	result.y = v.y / s;
+	result.z = v.z / s;
+	return result;
+}
+inline Vec3Int& operator/=(Vec3Int& v, int s)
+{
+	v = v / s;
+	return v;
+}
+
+inline bool operator==(const Vec3Int& v1, const Vec3Int& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
+}
+
+inline int MagSq(Vec3Int v)
+{
+	return v.x*v.x + v.y*v.y + v.z*v.z;
+}
+inline int Mag(Vec3Int v)
+{
+	return (int)sqrtf((float32)v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
 // -------------------- Vec4 --------------------
 const Vec4 Vec4::zero = {
     0.0f, 0.0f, 0.0f, 0.0f
@@ -538,6 +643,11 @@ inline Vec4& operator/=(Vec4& v, float32 s)
 inline bool operator==(const Vec4& v1, const Vec4& v2)
 {
     return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
+}
+
+inline Vec3 ToVec3(Vec4 v)
+{
+    return Vec3 { v.x, v.y, v.z };
 }
 
 // -------------------- Mat4 --------------------
@@ -697,12 +807,6 @@ Mat4 Projection(float32 fov, float32 aspect,
         0.0f, 0.0f, (farZ + nearZ) / nearMinusFar, -1.0f,
         0.0f, 0.0f, 2.0f*farZ*nearZ / nearMinusFar, 0.0f
     };
-	/*Mat4 proj = {
-        xScale, 0, 0, 0,
-        0, yScale, 0, 0,
-        0, 0, (farZ + nearZ) / nearMinusFar, 2.0f*farZ*nearZ / nearMinusFar,
-        0, 0, -1.0f, 0 
-    };*/
 
 	return proj;
 }

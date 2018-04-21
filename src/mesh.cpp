@@ -33,6 +33,33 @@ internal Vec3 ParseVec3(char* str)
             char* endptr = el;
             *c = '\0';
             result.e[i++] = (float32)strtod(el, &endptr);
+            if (i == 3) {
+                break;
+            }
+            // TODO check error
+            el = c + 1;
+        }
+    }
+
+    return result;
+}
+
+internal Vec2 ParseVec2(char* str)
+{
+    Vec2 result = { 0.0f, 0.0f };
+    char* el = str;
+    while (*el == ' ') {
+        el++;
+    }
+    int i = 0;
+    for (char* c = str; *c != '\0'; c++) {
+        if (*c == ' ' || *c == '\n') {
+            char* endptr = el;
+            *c = '\0';
+            result.e[i++] = (float32)strtod(el, &endptr);
+            if (i == 2) {
+                break;
+            }
             // TODO check error
             el = c + 1;
         }
@@ -60,8 +87,13 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     char line[OBJ_LINE_MAX];
     DynamicArray<Vec3> vertices;
     vertices.Init();
-    DynamicArray<int> faceInds;
-    faceInds.Init();
+    DynamicArray<Vec3> normals;
+    normals.Init();
+    DynamicArray<Vec2> uvs;
+    uvs.Init();
+
+    DynamicArray<int> faceVertInds;
+    faceVertInds.Init();
 
     while ((read = GetNextLine(fileStr, line, OBJ_LINE_MAX)) >= 0) {
         fileStr += read + 1;
@@ -74,11 +106,28 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
         }
         else if (line[0] == 'v') {
             if (line[1] == ' ') {
-                Vec3 v = ParseVec3(&line[2]);
+                int start = 2;
+                while (line[start] == ' ') {
+                    start++;
+                }
+                Vec3 v = ParseVec3(&line[start]);
                 vertices.Append(v);
             }
             else if (line[1] == 'n') {
-                DEBUG_PRINT("vertex normal! UNHANDLED\n");
+                int start = 3;
+                while (line[start] == ' ') {
+                    start++;
+                }
+                Vec3 n = ParseVec3(&line[start]);
+                normals.Append(n);
+            }
+            else if (line[1] == 't') {
+                int start = 3;
+                while (line[start] == ' ') {
+                    start++;
+                }
+                Vec2 uv = ParseVec2(&line[start]);
+                uvs.Append(uv);
             }
             else {
                 // idk
@@ -90,45 +139,45 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
                 if (*c == ' ' || *c == '\n') {
                     char* endptr = el;
                     *c = '\0';
-                    faceInds.Append((int)strtol(el, &endptr, 10) - 1);
+                    faceVertInds.Append((int)strtol(el, &endptr, 10) - 1);
                     // TODO check error
                     el = c + 1;
                 }
             }
-            faceInds.Append(-1);
+            faceVertInds.Append(-1);
         }
         else {
             // idk
         }
     }
 
-    DynamicArray<int> face;
-    face.Init();
-    for (int i = 0; i < (int)faceInds.size; i++) {
-        if (faceInds[i] == -1) {
-            if (face.size < 3) {
+    DynamicArray<int> faceVerts;
+    faceVerts.Init();
+    for (int i = 0; i < (int)faceVertInds.size; i++) {
+        if (faceVertInds[i] == -1) {
+            if (faceVerts.size < 3) {
                 DEBUG_PANIC("Face with < 3 vertices in %s\n", fileName);
             }
-            Vec3 v0 = vertices[face[0]];
-            int otherVerts = (int)face.size - 1;
-            for (int v = 1; v < (int)face.size - 1; v++) {
-                Vec3 v1 = vertices[face[v]];
-                Vec3 v2 = vertices[face[v + 1]];
+            Vec3 v0 = vertices[faceVerts[0]];
+            int otherVerts = (int)faceVerts.size - 1;
+            for (int v = 1; v < (int)faceVerts.size - 1; v++) {
+                Vec3 v1 = vertices[faceVerts[v]];
+                Vec3 v2 = vertices[faceVerts[v + 1]];
                 Triangle triangle;
                 triangle.v[0] = v0;
                 triangle.v[1] = v1;
                 triangle.v[2] = v2;
                 mesh.triangles.Append(triangle);
             }
-            face.Clear();
+            faceVerts.Clear();
         }
         else {
-            face.Append(faceInds[i]);
+            faceVerts.Append(faceVertInds[i]);
         }
     }
-    face.Free();
+    faceVerts.Free();
 
-    faceInds.Free();
+    faceVertInds.Free();
     vertices.Free();
     /*ComputeFaceNormals(&mesh);
     ComputeVertexNormals(&mesh);
@@ -140,7 +189,7 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
 }
 
 internal bool TriangleWorldToScreen(
-    const Vec3 world[3], Mat4 mvp, Vec2Int screen[3],
+    const Vec3 world[3], Mat4 mvp, Vec3Int screen[3],
     GameBackbuffer* backbuffer)
 {
     bool insideScreen = false;
@@ -148,14 +197,14 @@ internal bool TriangleWorldToScreen(
         Vec4 v4 = { world[i].x, world[i].y, world[i].z, 1.0f };
         v4 = mvp * v4;
         v4 /= v4.w;
-
         if (v4.z < -1.0f || v4.z > 1.0f) {
             return false;
         }
 
         screen[i] = {
-            RoundFloat32((v4.x + 1.0f) / 2.0f * backbuffer->width),
-            RoundFloat32((v4.y + 1.0f) / 2.0f * backbuffer->height)
+            (int)((v4.x + 1.0f) / 2.0f * backbuffer->width),
+            (int)((v4.y + 1.0f) / 2.0f * backbuffer->height),
+            (int)((-v4.z + 1.0f) / 2.0f * 255.0f)
         };
         if (0 <= screen[i].x
         && screen[i].x < backbuffer->width
@@ -172,28 +221,41 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer)
 {
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        Vec2Int triangleScreen[3];
+        Vec3Int triangleScreen[3];
         bool insideScreen = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
         if (insideScreen) {
             RenderTriangleWire(backbuffer, triangleScreen,
-                Vec4 { 1.0f, 0.0f, 0.0f, 1.0f });
+                Vec3 { 1.0f, 0.0f, 0.0f });
         }
     }
 }
 
-void RenderMeshFlat(const Mesh& mesh, Mat4 mvp,
+internal Vec3 NormalFromTriangle(const Vec3 triangle[3])
+{
+    Vec3 a = triangle[1] - triangle[0];
+    Vec3 b = triangle[2] - triangle[0];
+    return Normalize(Cross(a, b));
+}
+
+void RenderMeshFlat(const Mesh& mesh,
+    Mat4 mvp, Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer)
 {
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
-        Vec2Int triangleScreen[3];
+        Vec3Int triangleScreen[3];
         bool insideScreen = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
             backbuffer);
         if (insideScreen) {
-            RenderTriangleWire(backbuffer, triangleScreen,
-                Vec4 { 1.0f, 0.0f, 0.0f, 1.0f });
+            Vec3 centroid = (mesh.triangles[t].v[0]
+                + mesh.triangles[t].v[1]
+                + mesh.triangles[t].v[2]) / 3.0f;
+            Vec3 normal = NormalFromTriangle(mesh.triangles[t].v);
+            Vec3 color = CalculatePhongColor(centroid, normal,
+                cameraPos, lightPos, material);
+            RenderTriangleFlat(backbuffer, triangleScreen, color);
         }
     }
 }
