@@ -311,6 +311,8 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     UpdateButtons(gameState->shadeModeButtons, 4, input, (void*)gameState);
 
     // Update model fields
+    UpdateMeshFieldLayout(gameState, backbuffer);
+    
     ChangeMeshFieldData cmfData;
     cmfData.thread = thread;
     cmfData.gameState = gameState;
@@ -346,6 +348,9 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             }
         } break;
         case SHADEMODE_FLAT: {
+            for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+                RenderMeshFlat(gameState->meshFields[i].mesh, mvp, backbuffer);
+            }
         } break;
         case SHADEMODE_GOURAUD: {
         } break;

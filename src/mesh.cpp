@@ -149,6 +149,10 @@ internal bool TriangleWorldToScreen(
         v4 = mvp * v4;
         v4 /= v4.w;
 
+        if (v4.z < -1.0f || v4.z > 1.0f) {
+            return false;
+        }
+
         screen[i] = {
             RoundFloat32((v4.x + 1.0f) / 2.0f * backbuffer->width),
             RoundFloat32((v4.y + 1.0f) / 2.0f * backbuffer->height)
@@ -165,6 +169,21 @@ internal bool TriangleWorldToScreen(
 }
 
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
+    GameBackbuffer* backbuffer)
+{
+    for (int t = 0; t < (int)mesh.triangles.size; t++) {
+        Vec2Int triangleScreen[3];
+        bool insideScreen = TriangleWorldToScreen(
+            mesh.triangles[t].v, mvp, triangleScreen,
+            backbuffer);
+        if (insideScreen) {
+            RenderTriangleWire(backbuffer, triangleScreen,
+                Vec4 { 1.0f, 0.0f, 0.0f, 1.0f });
+        }
+    }
+}
+
+void RenderMeshFlat(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer)
 {
     for (int t = 0; t < (int)mesh.triangles.size; t++) {

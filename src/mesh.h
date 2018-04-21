@@ -22,6 +22,8 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
 
 void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer);
+void RenderMeshFlat(const Mesh& mesh, Mat4 mvp,
+    GameBackbuffer* backbuffer);
 
 void FreeMesh(Mesh* mesh);
 

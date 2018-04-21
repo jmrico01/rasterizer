@@ -33,8 +33,6 @@ paths["external"]       = paths["root"] + "/external"
 paths["src"]            = paths["root"] + "/src"
 
 paths["build-data"]     = paths["build"] + "/data"
-paths["build-shaders"]  = paths["build"] + "/shaders"
-paths["src-shaders"]    = paths["src"] + "/shaders"
 
 paths["main-cpp"]       = paths["src"] + "/main.cpp"
 paths["linux-main-cpp"] = paths["src"] + "/linux_main.cpp"
@@ -371,7 +369,6 @@ def CopyDir(srcPath, dstPath):
 def Debug():
     ComputeSrcHashes()
     CopyDir(paths["data"], paths["build-data"])
-    CopyDir(paths["src-shaders"], paths["build-shaders"])
 
     platformName = platform.system()
     if platformName == "Windows":
@@ -407,7 +404,6 @@ def IfChanged():
 
 def Release():
     CopyDir(paths["data"], paths["build-data"])
-    CopyDir(paths["src-shaders"], paths["build-shaders"])
 
     platformName = platform.system()
     if platformName == "Windows":
