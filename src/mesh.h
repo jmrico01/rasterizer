@@ -27,7 +27,7 @@ struct Mesh
     DynamicArray<Triangle> triangles;
 };
 
-struct PhongTriangle
+struct TriangleRenderInfo
 {
     Vec2Int screenPos[3];
     uint32 depth[3];
@@ -36,11 +36,11 @@ struct PhongTriangle
     Vec3 normal[3];
 };
 
-// Memory used by Phong shader for scratch work in rendering
+// Memory used by shaders for scratch work in rendering
 struct MeshScratch
 {
     int numTriangles;
-    PhongTriangle triangles[MAX_TRIANGLES];
+    TriangleRenderInfo triangles[MAX_TRIANGLES];
 };
 
 Mesh LoadMeshFromObj(ThreadContext* thread,
@@ -48,32 +48,25 @@ Mesh LoadMeshFromObj(ThreadContext* thread,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
     DEBUGPlatformFreeFileMemoryFunc* DEBUGPlatformFreeFileMemory);
 
-void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
-    GameBackbuffer* backbuffer);
+void RenderMeshWire(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj, Vec3 color,
+    GameBackbuffer* backbuffer, MeshScratch* scratch);
 void RenderMeshFlat(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
-    GameBackbuffer* backbuffer);
+    GameBackbuffer* backbuffer, MeshScratch* scratch);
 void RenderMeshGouraud(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
-    GameBackbuffer* backbuffer);
+    GameBackbuffer* backbuffer, MeshScratch* scratch);
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
-    GameBackbuffer* backbuffer);
-void RenderMeshPhong(const Mesh& mesh,
-    Mat4 model, Mat4 view, Mat4 proj,
-    bool32 backfaceCulling,
-    Vec3 cameraPos, Vec3 lightPos, Material material,
-    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
-    GameBackbuffer* backbuffer);
-
-// Optimized Phong shader
-void RenderMeshPhongOpt(const Mesh& mesh,
+    GameBackbuffer* backbuffer, MeshScratch* scratch);
+void RenderMeshPhongTextured(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
     bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
@@ -81,59 +74,3 @@ void RenderMeshPhongOpt(const Mesh& mesh,
     GameBackbuffer* backbuffer, MeshScratch* scratch);
 
 void FreeMesh(Mesh* mesh);
-
-/*HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName);
-HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh& mesh);
-void FreeHalfEdgeMesh(HalfEdgeMesh* mesh);
-
-void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh);
-void PrintEdgeEndpoints(const HalfEdgeMesh& mesh, uint32 e);
-void PrintHalfEdgeMeshFaces(const HalfEdgeMesh& mesh);
-
-HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals);
-void FreeHalfEdgeMeshGL(HalfEdgeMeshGL* meshGL);
-
-void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL, Mat4 proj, Mat4 view);
-
-// Utility functions
-void RemoveVertex(HalfEdgeMesh* mesh, uint32 v);
-void RemoveEdge(HalfEdgeMesh* mesh, uint32 e);
-void RemoveFace(HalfEdgeMesh* mesh, uint32 f);
-
-uint32 SplitEdgeMakeVertex(HalfEdgeMesh* mesh, uint32 e, float t);
-uint32 SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2);
-void TriangulateMesh(HalfEdgeMesh* mesh);
-void ComputeFaceNormals(HalfEdgeMesh* mesh);
-void ComputeFaceAreas(HalfEdgeMesh* mesh);
-void ComputeVertexNormals(HalfEdgeMesh* mesh);
-void ComputeVertexAvgEdgeLengths(HalfEdgeMesh* mesh);
-
-struct MouseCastFaceOut
-{
-    uint32 face;
-    float dist;
-};
-void MouseCastMeshFaces(const HalfEdgeMesh& mesh, Vec2 mousePos,
-    Mat4 proj, Mat4 view,
-    int screenWidth, int screenHeight,
-    DynamicArray<MouseCastFaceOut>& out);
-
-// Mesh traversal functions
-void VerticesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<uint32>& out);
-void EdgesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<uint32>& out);
-void FacesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<uint32>& out);
-
-void VerticesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<uint32>& out);
-void FacesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<uint32>& out);
-
-void VerticesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<uint32>& out);
-void EdgesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<uint32>& out);
-void FacesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<uint32>& out);*/

@@ -268,6 +268,14 @@ const Vec2Int Vec2Int::zero = {
     0, 0
 };
 
+inline Vec2 ToVec2(Vec2Int v)
+{
+    Vec2 result;
+    result.x = (float32)v.x;
+    result.y = (float32)v.y;
+    return result;
+}
+
 inline Vec2Int operator-(Vec2Int v)
 {
 	Vec2Int result;
@@ -363,9 +371,14 @@ const Vec3 Vec3::unitZ = {
     0.0f, 0.0f, 1.0f
 };
 
-inline Vec3 ToVec3(Vec4 v)
+inline Vec4 ToVec4(Vec3 v, float32 w)
 {
-    return Vec3 { v.x, v.y, v.z };
+    Vec4 result;
+    result.x = v.x;
+    result.y = v.y;
+    result.z = v.z;
+    result.w = w;
+    return result;
 }
 
 inline Vec3 operator-(Vec3 v)
@@ -586,14 +599,9 @@ const Vec4 Vec4::blue = {
     0.0f, 0.0f, 1.0f, 1.0f
 };
 
-inline Vec4 ToVec4(Vec3 v, float32 w)
+inline Vec3 ToVec3(Vec4 v)
 {
-    Vec4 result;
-    result.x = v.x;
-    result.y = v.y;
-    result.z = v.z;
-    result.w = w;
-    return result;
+    return Vec3 { v.x, v.y, v.z };
 }
 
 inline Vec4 operator-(Vec4 v)

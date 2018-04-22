@@ -598,12 +598,16 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         0.1f, 10.0f);
     Mat4 view = Translate(-gameState->cameraPos);
     Mat4 model = UnitQuatToMat4(gameState->modelRot);
-    Mat4 mvp = proj * view * model;
 
     for (int i = 0; i < (int)gameState->meshFields.size; i++) {
+        DEBUG_ASSERT(sizeof(MeshScratch) <= memory->transientStorageSize);
+        MeshScratch* meshScratch = (MeshScratch*)memory->transientStorage;
+
         switch (gameState->shadeMode) {
             case SHADEMODE_WIRE: {
-                RenderMeshWire(gameState->meshFields[i].mesh, mvp, backbuffer);
+                RenderMeshWire(gameState->meshFields[i].mesh,
+                    model, view, proj, Vec3 { 1.0f, 0.0f, 0.0f },
+                    backbuffer, meshScratch);
             } break;
             case SHADEMODE_FLAT: {
                 RenderMeshFlat(gameState->meshFields[i].mesh,
@@ -611,7 +615,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                     gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
-                    backbuffer);
+                    backbuffer, meshScratch);
             } break;
             case SHADEMODE_GOURAUD: {
                 RenderMeshGouraud(gameState->meshFields[i].mesh,
@@ -619,7 +623,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                     gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
-                    backbuffer);
+                    backbuffer, meshScratch);
             } break;
             case SHADEMODE_PHONG: {
                 RenderMeshPhong(gameState->meshFields[i].mesh,
@@ -627,14 +631,9 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                     gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
-                    backbuffer);
+                    backbuffer, meshScratch);
             } break;
             case SHADEMODE_PHONG_MAT: {
-	            DEBUG_ASSERT(sizeof(MeshScratch)
-                    <= memory->transientStorageSize);
-                MeshScratch* meshScratch =
-                    (MeshScratch*)memory->transientStorage;
-
                 Bitmap* diffuseMap = nullptr;
                 Bitmap* specularMap = nullptr;
                 Bitmap* normalMap = nullptr;
@@ -672,14 +671,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                     normalMap = &gameState->diabloNormalMap;
                 }
                 if (diffuseMap != nullptr && specularMap != nullptr) {
-                    /*RenderMeshPhong(gameState->meshFields[i].mesh,
-                        model, view, proj,
-                        gameState->backfaceCulling,
-                        gameState->cameraPos, gameState->lightPos,
-                        gameState->globalMaterial,
-                        diffuseMap, specularMap, normalMap,
-                        backbuffer);*/
-                    RenderMeshPhongOpt(gameState->meshFields[i].mesh,
+                    RenderMeshPhongTextured(gameState->meshFields[i].mesh,
                         model, view, proj,
                         gameState->backfaceCulling,
                         gameState->cameraPos, gameState->lightPos,

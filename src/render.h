@@ -26,22 +26,20 @@ void RenderOverwriteColorBitmap(
     GameBackbuffer* backbuffer, Vec2Int pos,
     Bitmap* bitmap);
 
-void RenderTriangleWire(GameBackbuffer* backbuffer,
-    Vec3Int verts[3], Vec3 color);
-void RenderTriangleFlat(GameBackbuffer* backbuffer,
-    Vec3Int verts[3], Vec3 color);
-void RenderTriangleGouraud(GameBackbuffer* backbuffer,
-    Vec3Int verts[3], Vec3 colors[3]);
-void RenderTrianglePhong(GameBackbuffer* backbuffer,
-    Vec3Int verts[3], Vec3 camVerts[3], Vec3 camNormals[3],
+void RenderTrianglesWire(GameBackbuffer* backbuffer,
+    const MeshScratch* scratch,
+    Vec3 color);
+void RenderTrianglesFlat(GameBackbuffer* backbuffer,
+    const MeshScratch* scratch,
     Vec3 cameraPos, Vec3 lightPos, Material material);
-void RenderTrianglePhong(GameBackbuffer* backbuffer,
-    Vec3Int verts[3], Vec3 camVerts[3], Vec2 uvs[3], Vec3 camNormals[3],
-    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+void RenderTrianglesGouraud(GameBackbuffer* backbuffer,
+    const MeshScratch* scratch,
     Vec3 cameraPos, Vec3 lightPos, Material material);
-
 void RenderTrianglesPhong(GameBackbuffer* backbuffer,
-    MeshScratch* scratch,
+    const MeshScratch* scratch,
+    Vec3 cameraPos, Vec3 lightPos, Material material);
+void RenderTrianglesPhongTextured(GameBackbuffer* backbuffer,
+    const MeshScratch* scratch,
     Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     Vec3 cameraPos, Vec3 lightPos, Material material);
 
