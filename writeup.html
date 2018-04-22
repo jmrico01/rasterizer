@@ -27,36 +27,94 @@
 <li>(0.5) <a href='#Optimization+Contest'>Optimization Contest</a></li>
         </ul></div>
 
+<p><hr><p><a name='Important Note'></a><h1>Important Note</h1><p><hr><p>
+
+Once again, I have decided to develop this assignment from scratch in C++. This time, I'm proud to say that the amount of external libraries used has diminished. I'm using the Win32 API for window creation and input, FreeType for font file bitmap loading, and occasionally, the C standard library.
+
+<p>
+I had to re-implement many of the given systems for this assignment. These include, but are probably not limited to:
+<ul>
+    <li>Win32 platform layer, heavily inspired by <a href="https://handmadehero.org/">Handmade Hero</a></li>
+    <li>Bitmap backbuffer rendering and display</li>
+    <li>Understanding and implementing a proper depth buffer</li>
+    <li>Parsing OBJ files into some sensible format (list of triangles)</li>
+    <li>Text rendering, with the help of FreeType</li>
+    <li>Interactive GUI elements in pixel coordinates</li>
+    <li>Bitmap format image import, rendering, and UV access</li>
+    <li>Math library with Vectors, Matrices, Quaternions</li>
+</ul>
+
+<p>I am turning in a Windows executable, titled "rasterizer_win32.exe", which is in the "build" directory. The library file "rasterizer_game.dll" is there as a product of my development environment: it contains all non-Windows-specific code, and gets dynamically linked to the executable. The "data" directory contains all 3D models, textures, and font files. All libraries are statically linked, so the program should require no external libraries other than the Visual C++ runtime.</p>
+
+<h2>Controls</h2>
+
+<p>The GUI controls are similar to Assignment 2, and I think are quite intuitive. Clicking and dragging rotates the camera, the arrow keys move the camera along the X and Y axes, scrolling controls the zoom (Z axis), and clicking on things allows you to interact with them. Clicking on the input fields (box with numbers), typing, <i>and pressing ENTER</i> allows you to change their values (e.g. ambient color, diffuse color, specular color, shininess, etc).</p>
+
 <p><hr><p><a name='Perspective+Projection'></a><h1>Perspective Projection</h1><p><hr><p>
-(Your description of your implentation of Perspective Projection goes here...)
+I feel like this was quite artifically abstracted out in the JavaScript implementation. All of these processes (model, view, perspective projection, followed by clipping in homogeneous coordinates and transformation to screen space) occur in the <i>TriangleWorldToScreen function in mesh.cpp</i>. Triangles are not rendered if ANY of their vertices are outside the valid z range (-1 to 1), or if ALL of their vertices are outside the valid x-y ranges.
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Phong+Reflection+Model'></a><h1>Phong Reflection Model</h1><p><hr><p>
-(Your description of your implentation of Phong Reflection Model goes here...)
+<br>You can include as many results as you want, but please at least include the following results:
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Bounding+Box'></a><h1>Bounding Box</h1><p><hr><p>
-(Your description of your implentation of Bounding Box goes here...)
+<p><hr><p><a name='Phong+Reflection+Model'></a><h1>Phong Reflection Model</h1><p><hr><p>
+Straightforward implementation of the phong formula. Located in <i>render.cpp, in the CalculatePhongColor function</i>. Adds the ambient color, adds the diffuse color scaled by the dot product of the normal and the light vector, and finally adds the specular color scaled by the dot product of the view and reflected light vectors, raised to the power of "shininess".
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Barycentric+Coordinates'></a><h1>Barycentric Coordinates</h1><p><hr><p>
-(Your description of your implentation of Barycentric Coordinates goes here...)
+<br>You can include as many results as you want, but please at least include the following results:
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Flat+Shader'></a><h1>Flat Shader</h1><p><hr><p>
-(Your description of your implentation of Flat Shader goes here...)
+<p><hr><p><a name='Bounding+Box'></a><h1>Bounding Box</h1><p><hr><p>
+Straightforward implementation, get the minimum and maximum x-y coordinates of the three points of the triangle, and you have defined a bounding box. Implemented in <i>render.cpp, function ComputeTriangleBoundingBox</i>.
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Gouraud+Shader'></a><h1>Gouraud Shader</h1><p><hr><p>
-(Your description of your implentation of Gouraud Shader goes here...)
+<br>You can include as many results as you want, but please at least include the following results:
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Phong+Shader'></a><h1>Phong Shader</h1><p><hr><p>
-(Your description of your implentation of Phong Shader goes here...)
+<p><hr><p><a name='Barycentric+Coordinates'></a><h1>Barycentric Coordinates</h1><p><hr><p>
+Implemented in <i>ComputeBarycentricCoords, render.cpp</i>. Heavily based on the <a href="https://fgiesen.wordpress.com/2013/02/06/the-barycentric-conspirac/">article</a> provided on the assignment page. Compute each barycentric coordinate as the ratio of the area of the triangle formed by the point and the opposite edge to the area of the entire triangle. Range checking these coordinates allows for quickly verifying whether a given pixel is inside the triangle.
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Diffuse+Mapping'></a><h1>Diffuse Mapping</h1><p><hr><p>
-(Your description of your implentation of Diffuse Mapping goes here...)
+<br>You can include as many results as you want, but please at least include the following results:
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='XYZ+Normal+Mapping'></a><h1>XYZ Normal Mapping</h1><p><hr><p>
-(Your description of your implentation of XYZ Normal Mapping goes here...)
+<p><hr><p><a name='Flat+Shader'></a><h1>Flat Shader</h1><p><hr><p>
+I compute a single color for the entire face, using the CalculatePhongColor function implemented earlier. I pass in the centroid of each triangle as the vertex, and the average of the normals as the normal. I then pass in this color to a routine which fills in the triangles in pixel coordinates. This is done by looping through every pixel in the triangle's bounding box, and then checking whether it's inside using barycentric coordinates. This happens in the functions <i>RenderMeshFlat and RenderTriangleFlat, in mesh.cpp and render.cpp</i>.
 
-<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Optimization+Contest'></a><h1>Optimization Contest</h1><p><hr><p>
-(Your description of your implentation of Optimization Contest goes here...)
+<br><img src='results/flat1.png'><br>
+<br><img src='results/flat2.png'>
 
-<br>You can include as many results as you want, but please at least include the following results:    </div>
+<p><hr><p><a name='Gouraud+Shader'></a><h1>Gouraud Shader</h1><p><hr><p>
+Same as the flat shader, except I call CalculatePhongColor for every vertex in the triangle. Then, I pass a color for each vertex, so that when the triangle is rendered, the barycentric coordinates are used to interpolate the color between the three vertices of the triangle. Implemented in <i>mesh.cpp and render.cpp, functions RenderMeshGouraud and RenderTriangleGouraud.</i>
+
+<br><img src='results/gouraud1.png'>
+
+<p><hr><p><a name='Phong+Shader'></a><h1>Phong Shader</h1><p><hr><p>
+Same as before, except instead of passing in the color, I pass in the camera-space vertex positions and normals. I interpolate these using barycentric coordinates, and call CalculatePhongColor on each pixel in the result to get a very smooth flat-colored lighting. Implemented in <i>mesh.cpp and render.cpp, functions RenderMeshPhong and RenderTrianglePhong (the ones without bitmap arguments).</i>
+
+<br><img src='results/phong1.png'>
+
+<p><hr><p><a name='Diffuse+Mapping'></a><h1>Diffuse Mapping</h1><p><hr><p>
+Described in XYZ Normal Mapping, since it is almost the same.
+
+<br><img src='results/textureMap0.png'>
+
+<p><hr><p><a name='XYZ+Normal+Mapping'></a><h1>XYZ Normal Mapping</h1><p><hr><p>
+Same as the normal Phong Shader, except I also pass in bitmaps for diffuse, specular, and normal maps. I also pass in the uv of each vertex, and interpolate them using barycentric coordinates. I then sample the texture, and overwrite the default Phong material diffuse and specular colors with the ones obtained from the texture maps. For the normals, I sample the normal map just like a color, with the UV, and normalize it. All of these go, as always into CalculatePhongColor, for each pixel. Implemented in <i>mesh.cpp and render.cpp, functions RenderMeshPhong and RenderTrianglePhong (the ones with bitmap arguments).</i>
+
+<br><img src='results/textureMap1.png'>
+<br><img src='results/textureMap2.png'>
+
+<p><hr><p><a name='Optimization+Contest'></a><h1>Optimization Contest</h1><p><hr><p>
+Part of the reason why I did this in C++ (apart from getting to implement the given systems by myself, and thus understanding the graphics pipeline better) is because the prospect of fighting JavaScript to optimize things sounded awful. Of course, I suspect (I hope) my framerates will blow the browser implementations out of the water. However, I'm not quite sure I can compete with the <i>ratios</i> of Phong to Wire shaders.
+
+<p>
+I have written the program in such a way to structure the vertex data coherently and perform transformations on model data such that it is quite reasonably batched up. I will work on improving this up until the deadline for the assignment. I have also implemented back-face culling, which usually about doubles framerates. The functions <i>RenderMeshPhongOpt and RenderTrianglesPhongOpt in mesh.cpp and render.cpp</i> are batched up, optimized versions of the material phong shader, which are also heavily parallelizable (help me, GPU).
+
+<p>
+My latest measurements of framerates were, for the scene in the last screenshot in this writeup (which is the same as the assignment test scene):
+<ul>
+    <li>Wireframe: ~ 110 FPS</li>
+    <li>Phong: ~ 25 FPS</li>
+    <li>Ratio: ~ 0.218</li>
+</ul>
+
+I ran this at a higher resolution than requested (1280x800 vs 800x600), with back-face culling enabled. I'm running on Windows 10 with an Intel Core i5-6500 CPU, and an NVIDIA GTX 670 GPU (not that it's being very helpful...)
+
+<br><img src='results/textureMap1.png'>
+<br><img src='results/textureMap2.png'>
+
 </body>
 </html>

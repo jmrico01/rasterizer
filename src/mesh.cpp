@@ -526,6 +526,7 @@ internal bool IsCCW(Vec3Int triangle[3])
 
 internal bool TriangleWorldToScreen(
     const Vec3 world[3], Mat4 mvp, Vec3Int screen[3],
+    bool32 backfaceCulling,
     GameBackbuffer* backbuffer)
 {
     bool shouldRender = false;
@@ -550,10 +551,9 @@ internal bool TriangleWorldToScreen(
         }
     }
 
-    // TODO: include on/off setting
-    /*if (!IsCCW(screen)) {
+    if (backfaceCulling && !IsCCW(screen)) {
         return false;
-    }*/
+    }
 
     return shouldRender;
 }
@@ -564,7 +564,7 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     Vec3Int triangleScreen[3];
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
         bool shouldRender = TriangleWorldToScreen(
-            mesh.triangles[t].v, mvp, triangleScreen,
+            mesh.triangles[t].v, mvp, triangleScreen, false,
             backbuffer);
         if (shouldRender) {
             RenderTriangleWire(backbuffer, triangleScreen,
@@ -575,6 +575,7 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
 
 void RenderMeshFlat(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer)
 {
@@ -583,7 +584,7 @@ void RenderMeshFlat(const Mesh& mesh,
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
         bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
-            backbuffer);
+            backfaceCulling, backbuffer);
         if (shouldRender) {
             Vec3 centroid = (mesh.triangles[t].v[0]
                 + mesh.triangles[t].v[1]
@@ -602,6 +603,7 @@ void RenderMeshFlat(const Mesh& mesh,
 
 void RenderMeshGouraud(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer)
 {
@@ -611,7 +613,7 @@ void RenderMeshGouraud(const Mesh& mesh,
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
         bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
-            backbuffer);
+            backfaceCulling, backbuffer);
         if (shouldRender) {
             Vec3 vert, norm;
             for (int v = 0; v < 3; v++) {
@@ -628,6 +630,7 @@ void RenderMeshGouraud(const Mesh& mesh,
 
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer)
 {
@@ -638,7 +641,7 @@ void RenderMeshPhong(const Mesh& mesh,
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
         bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
-            backbuffer);
+            backfaceCulling, backbuffer);
         if (shouldRender) {
             for (int v = 0; v < 3; v++) {
                 cameraVerts[v] = ToVec3(model
@@ -655,6 +658,7 @@ void RenderMeshPhong(const Mesh& mesh,
 
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     GameBackbuffer* backbuffer)
@@ -666,7 +670,7 @@ void RenderMeshPhong(const Mesh& mesh,
     for (int t = 0; t < (int)mesh.triangles.size; t++) {
         bool shouldRender = TriangleWorldToScreen(
             mesh.triangles[t].v, mvp, triangleScreen,
-            backbuffer);
+            backfaceCulling, backbuffer);
         if (shouldRender) {
             for (int v = 0; v < 3; v++) {
                 cameraVerts[v] = ToVec3(model
@@ -680,6 +684,75 @@ void RenderMeshPhong(const Mesh& mesh,
                 cameraPos, lightPos, material);
         }
     }
+}
+
+internal inline bool32 IsCCW(Vec4 triangle[3])
+{
+    Vec2 e01 = {
+        triangle[1].x - triangle[0].x,
+        triangle[1].y - triangle[0].y
+    };
+    Vec2 e02 = {
+        triangle[2].x - triangle[0].x,
+        triangle[2].y - triangle[0].y
+    };
+    e02 = { -e02.y, e02.x };
+    return Dot(e01, e02) <= 0.0f;
+}
+
+void RenderMeshPhongOpt(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    GameBackbuffer* backbuffer, MeshScratch* scratch)
+{
+    DEBUG_ASSERT(mesh.triangles.size <= MAX_TRIANGLES);
+    Mat4 mvp = proj * view * model;
+    int tCount = 0;
+    scratch->numTriangles = 0;
+    Vec4 transformed[3];
+    for (int t = 0; t < (int)mesh.triangles.size; t++) {
+        bool shouldRender = false;
+        for (int i = 0; i < 3; i++) {
+            transformed[i] = ToVec4(mesh.triangles[t].v[i], 1.0f);
+            transformed[i] = mvp * transformed[i];
+            transformed[i] /= transformed[i].w;
+            if (transformed[i].z < -1.0f || transformed[i].z > 1.0f) {
+                shouldRender = false;
+                break;
+            }
+            if (-1.0f <= transformed[i].x && transformed[i].x <= 1.0f
+            && -1.0f <= transformed[i].y && transformed[i].y <= 1.0f) {
+                shouldRender = true;
+            }
+        }
+
+        if (!shouldRender || (backfaceCulling && !IsCCW(transformed))) {
+            continue;
+        }
+
+        for (int i = 0; i < 3; i++) {
+            scratch->triangles[tCount].screenPos[i] = {
+                (int)((transformed[i].x + 1.0f) / 2.0f * backbuffer->width),
+                (int)((transformed[i].y + 1.0f) / 2.0f * backbuffer->height)
+            };
+            scratch->triangles[tCount].depth[i] =
+                (uint32)((-transformed[i].z + 1.0f) / 2.0f * UINT32_MAX);
+
+            scratch->triangles[tCount].pos[i] = ToVec3(model
+                * ToVec4(mesh.triangles[t].v[i], 1.0f));
+            scratch->triangles[tCount].uv[i] = mesh.triangles[t].uv[i];
+            scratch->triangles[tCount].normal[i] = ToVec3(model
+                * ToVec4(mesh.triangles[t].n[i], 0.0f));
+        }
+        tCount++;
+    }
+    scratch->numTriangles = tCount;
+
+    RenderTrianglesPhong(backbuffer, scratch,
+        diffuseMap, specularMap, normalMap,
+        cameraPos, lightPos, material);
 }
 
 void FreeMesh(Mesh* mesh)

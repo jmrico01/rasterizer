@@ -40,5 +40,10 @@ void RenderTrianglePhong(GameBackbuffer* backbuffer,
     Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     Vec3 cameraPos, Vec3 lightPos, Material material);
 
+void RenderTrianglesPhong(GameBackbuffer* backbuffer,
+    MeshScratch* scratch,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    Vec3 cameraPos, Vec3 lightPos, Material material);
+
 Vec3 CalculatePhongColor(Vec3 vertex, Vec3 normal,
     Vec3 cameraPos, Vec3 lightPos, Material material);

@@ -15,6 +15,15 @@ inline int MaxInt(int a, int b) {
 inline int ClampInt(int a, int min, int max) {
     return MinInt(MaxInt(a, min), max);
 }
+inline uint32 MinUInt32(uint32 a, uint32 b) {
+    return a < b ? a : b;
+}
+inline uint32 MaxUInt32(uint32 a, uint32 b) {
+    return a > b ? a : b;
+}
+inline uint32 ClampUInt32(uint32 a, uint32 min, uint32 max) {
+    return MinUInt32(MaxUInt32(a, min), max);
+}
 inline float32 MinFloat32(float32 a, float32 b) {
     return a < b ? a : b;
 }

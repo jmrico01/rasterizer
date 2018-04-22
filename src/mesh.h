@@ -5,6 +5,8 @@
 #include "load_bmp.h"
 #include "main_platform.h"
 
+#define MAX_TRIANGLES 500000
+
 struct Material
 {
     Vec3 ambient;
@@ -25,6 +27,22 @@ struct Mesh
     DynamicArray<Triangle> triangles;
 };
 
+struct PhongTriangle
+{
+    Vec2Int screenPos[3];
+    uint32 depth[3];
+    Vec3 pos[3];
+    Vec2 uv[3];
+    Vec3 normal[3];
+};
+
+// Memory used by Phong shader for scratch work in rendering
+struct MeshScratch
+{
+    int numTriangles;
+    PhongTriangle triangles[MAX_TRIANGLES];
+};
+
 Mesh LoadMeshFromObj(ThreadContext* thread,
     const char* fileName,
     DEBUGPlatformReadFileFunc* DEBUGPlatformReadFile,
@@ -34,21 +52,33 @@ void RenderMeshWire(const Mesh& mesh, Mat4 mvp,
     GameBackbuffer* backbuffer);
 void RenderMeshFlat(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer);
 void RenderMeshGouraud(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer);
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     GameBackbuffer* backbuffer);
 void RenderMeshPhong(const Mesh& mesh,
     Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
     Vec3 cameraPos, Vec3 lightPos, Material material,
     Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
     GameBackbuffer* backbuffer);
+
+// Optimized Phong shader
+void RenderMeshPhongOpt(const Mesh& mesh,
+    Mat4 model, Mat4 view, Mat4 proj,
+    bool32 backfaceCulling,
+    Vec3 cameraPos, Vec3 lightPos, Material material,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    GameBackbuffer* backbuffer, MeshScratch* scratch);
 
 void FreeMesh(Mesh* mesh);
 

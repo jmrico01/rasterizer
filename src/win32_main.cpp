@@ -688,7 +688,7 @@ int CALLBACK WinMain(
 
 	GameMemory gameMemory = {};
 	gameMemory.permanentStorageSize = MEGABYTES(512);
-	gameMemory.transientStorageSize = MEGABYTES(1);
+	gameMemory.transientStorageSize = MEGABYTES(128);
 
 	gameMemory.DEBUGPlatformPrint = DEBUGPlatformPrint;
 	gameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;

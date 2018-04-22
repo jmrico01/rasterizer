@@ -63,6 +63,25 @@ internal void CatStrings(
 	*dest++ = '\0';
 }
 
+internal void ChangeLightPosCallback(InputField* inputField, void* data)
+{
+    GameState* gameState = (GameState*)data;
+    float32 floatVal = (float32)strtod(inputField->text, nullptr);
+
+    for (int i = 0; i < 3; i++) {
+        if (inputField == &gameState->lightPosFields[i]) {
+            gameState->lightPos.e[i] = floatVal;
+            return;
+        }
+    }
+}
+
+internal void ToggleBackfaceCullingCallback(Button* button, void* data)
+{
+    GameState* gameState = (GameState*)data;
+    gameState->backfaceCulling = !gameState->backfaceCulling;
+}
+
 internal void ChangeShadingModeCallback(Button* button, void* data)
 {
     GameState* gameState = (GameState*)data;
@@ -245,11 +264,13 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
         
         gameState->shadeMode = SHADEMODE_WIRE;
-        gameState->lightPos = Vec3 { 2.0f, 2.0f, 10.0f };
+        // initialized later
+        //gameState->lightPos = Vec3 { 2.0f, 2.0f, 10.0f };
         gameState->globalMaterial.ambient = Vec3 { 0.0f, 0.0f, 0.0f };
         gameState->globalMaterial.diffuse = Vec3 { 1.0f, 1.0f, 1.0f };
         gameState->globalMaterial.specular = Vec3 { 1.0f, 1.0f, 1.0f };
         gameState->globalMaterial.shininess = 5;
+        gameState->backfaceCulling = false;
         
         FT_Error error = FT_Init_FreeType(&gameState->library);
         if (error) {
@@ -336,14 +357,55 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                 defaultTextColor
             );
         }
-        Vec2Int pos = colorFieldsOrigin;
-        pos.y += colorFieldsStride.y * 3;
+        Vec2Int shinyPos = colorFieldsOrigin;
+        shinyPos.y += colorFieldsStride.y * 3;
         gameState->shininessField = CreateInputField(
-            pos, colorFieldsSize,
+            shinyPos, colorFieldsSize,
             "5", &ChangeMaterialCallback,
             defaultIdleColor, defaultHoverColor, defaultPressColor,
             defaultTextColor
         );
+
+        Vec2Int backfaceCullingButtonSize = {
+            180, (int)gameState->fontFaceMedium.height + UI_ITEM_SPACING
+        };
+        Vec2Int backfaceCullingButtonOrigin = {
+            colorFieldsOrigin.x + colorFieldsStride.x * 3
+                + UI_ITEM_SPACING * 2,
+            UI_MARGIN
+        };
+        gameState->backfaceCullingButton = CreateButton(
+            backfaceCullingButtonOrigin, backfaceCullingButtonSize,
+            "Back-Face Culling", &ToggleBackfaceCullingCallback,
+            defaultIdleColor, defaultHoverColor, defaultPressColor,
+            defaultTextColor
+        );
+
+        Vec2Int lightPosFieldsSize = {
+            50, (int)gameState->fontFaceSmall.height + UI_ITEM_SPACING
+        };
+        Vec2Int lightPosFieldsOrigin = {
+            backfaceCullingButtonOrigin.x,
+            backfaceCullingButtonOrigin.y + backfaceCullingButtonSize.y
+                + UI_ITEM_SPACING * 3
+        };
+        Vec2Int lightPosFieldsStride = {
+            colorFieldsSize.x + UI_ITEM_SPACING, 0
+        };
+        const char* lightPosFieldsInit[3] = {
+            "10", "4", "-0.5"
+        };
+        for (int i = 0; i < 3; i++) {
+            Vec2Int pos = lightPosFieldsOrigin + lightPosFieldsStride * i;
+            gameState->lightPosFields[i] = CreateInputField(
+                pos, lightPosFieldsSize,
+                lightPosFieldsInit[i], &ChangeLightPosCallback,
+                defaultIdleColor, defaultHoverColor, defaultPressColor,
+                defaultTextColor
+            );
+            ChangeLightPosCallback(&gameState->lightPosFields[i],
+                (void*)gameState);
+        }
 
         gameState->meshFields.Init();
         AddMeshField(thread, gameState, "afrhead.obj", backbuffer,
@@ -457,30 +519,17 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     gameState->cameraPos.z = DEFAULT_CAM_Z
         * powf(CAM_ZOOM_STEP, (float)input->mouseWheel);
     if (WasKeyPressed(input, KM_KEY_ARROW_UP)) {
-        //gameState->cameraPos.y += CAM_MOVE_STEP;
-        gameState->lightPos.y += CAM_MOVE_STEP*2;
+        gameState->cameraPos.y += CAM_MOVE_STEP;
     }
     if (WasKeyPressed(input, KM_KEY_ARROW_DOWN)) {
-        //gameState->cameraPos.y -= CAM_MOVE_STEP;
-        gameState->lightPos.y -= CAM_MOVE_STEP*2;
+        gameState->cameraPos.y -= CAM_MOVE_STEP;
     }
     if (WasKeyPressed(input, KM_KEY_ARROW_LEFT)) {
-        //gameState->cameraPos.x -= CAM_MOVE_STEP;
-        gameState->lightPos.x -= CAM_MOVE_STEP*2;
+        gameState->cameraPos.x -= CAM_MOVE_STEP;
     }
     if (WasKeyPressed(input, KM_KEY_ARROW_RIGHT)) {
-        //gameState->cameraPos.x += CAM_MOVE_STEP;
-        gameState->lightPos.x += CAM_MOVE_STEP*2;
+        gameState->cameraPos.x += CAM_MOVE_STEP;
     }
-    if (WasKeyPressed(input, KM_KEY_Q)) {
-        //gameState->cameraPos.x -= CAM_MOVE_STEP;
-        gameState->lightPos.z -= CAM_MOVE_STEP*2;
-    }
-    if (WasKeyPressed(input, KM_KEY_E)) {
-        //gameState->cameraPos.x += CAM_MOVE_STEP;
-        gameState->lightPos.z += CAM_MOVE_STEP*2;
-    }
-    DEBUG_PRINT("camera: %f, %f, %f\n", gameState->lightPos.x, gameState->lightPos.y, gameState->lightPos.z);
     
     // Update shade mode buttons
     for (int i = 0; i < SHADEMODE_LAST; i++) {
@@ -494,7 +543,6 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
         interestHoverColor;
     gameState->shadeModeButtons[gameState->shadeMode].box.pressColor =
         interestPressColor;
-
     UpdateButtons(gameState->shadeModeButtons, SHADEMODE_LAST,
         input, (void*)gameState);
 
@@ -503,6 +551,23 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     UpdateInputFields(gameState->diffuseFields, 3, input, (void*)gameState);
     UpdateInputFields(gameState->specularFields, 3, input, (void*)gameState);
     UpdateInputFields(&gameState->shininessField, 1, input, (void*)gameState);
+
+    // Update light position fields
+    UpdateInputFields(gameState->lightPosFields, 3, input, (void*)gameState);
+    
+    // Update backface culling button
+    if (gameState->backfaceCulling) {
+        gameState->backfaceCullingButton.box.color = interestIdleColor;
+        gameState->backfaceCullingButton.box.hoverColor = interestHoverColor;
+        gameState->backfaceCullingButton.box.pressColor = interestPressColor;
+    }
+    else {
+        gameState->backfaceCullingButton.box.color = defaultIdleColor;
+        gameState->backfaceCullingButton.box.hoverColor = defaultHoverColor;
+        gameState->backfaceCullingButton.box.pressColor = defaultPressColor;
+    }
+    UpdateButtons(&gameState->backfaceCullingButton, 1,
+        input, (void*)gameState);
 
     // Update model fields
     UpdateMeshFieldLayout(gameState, backbuffer);
@@ -543,6 +608,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             case SHADEMODE_FLAT: {
                 RenderMeshFlat(gameState->meshFields[i].mesh,
                     model, view, proj,
+                    gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
                     backbuffer);
@@ -550,6 +616,7 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             case SHADEMODE_GOURAUD: {
                 RenderMeshGouraud(gameState->meshFields[i].mesh,
                     model, view, proj,
+                    gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
                     backbuffer);
@@ -557,11 +624,17 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
             case SHADEMODE_PHONG: {
                 RenderMeshPhong(gameState->meshFields[i].mesh,
                     model, view, proj,
+                    gameState->backfaceCulling,
                     gameState->cameraPos, gameState->lightPos,
                     gameState->globalMaterial,
                     backbuffer);
             } break;
             case SHADEMODE_PHONG_MAT: {
+	            DEBUG_ASSERT(sizeof(MeshScratch)
+                    <= memory->transientStorageSize);
+                MeshScratch* meshScratch =
+                    (MeshScratch*)memory->transientStorage;
+
                 Bitmap* diffuseMap = nullptr;
                 Bitmap* specularMap = nullptr;
                 Bitmap* normalMap = nullptr;
@@ -599,12 +672,20 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
                     normalMap = &gameState->diabloNormalMap;
                 }
                 if (diffuseMap != nullptr && specularMap != nullptr) {
-                    RenderMeshPhong(gameState->meshFields[i].mesh,
+                    /*RenderMeshPhong(gameState->meshFields[i].mesh,
                         model, view, proj,
+                        gameState->backfaceCulling,
                         gameState->cameraPos, gameState->lightPos,
                         gameState->globalMaterial,
                         diffuseMap, specularMap, normalMap,
-                        backbuffer);
+                        backbuffer);*/
+                    RenderMeshPhongOpt(gameState->meshFields[i].mesh,
+                        model, view, proj,
+                        gameState->backfaceCulling,
+                        gameState->cameraPos, gameState->lightPos,
+                        gameState->globalMaterial,
+                        diffuseMap, specularMap, normalMap,
+                        backbuffer, meshScratch);
                 }
             } break;
 
@@ -670,6 +751,17 @@ extern "C" GAME_UPDATE_AND_RENDER_FUNC(GameUpdateAndRender)
     RenderText(&gameState->fontFaceMedium, "Shininess",
         topPos, defaultTextColor, backbuffer);
     DrawInputFields(&gameState->shininessField, 1,
+        backbuffer, &gameState->fontFaceSmall);
+    
+    // Draw backface culling button
+    DrawButtons(&gameState->backfaceCullingButton, 1,
+        backbuffer, &gameState->fontFaceMedium);
+
+    // Draw light pos fields
+    topPos = gameState->lightPosFields[0].box.origin + colorFieldsOffset;
+    RenderText(&gameState->fontFaceMedium, "Light Position",
+        topPos, defaultTextColor, backbuffer);
+    DrawInputFields(gameState->lightPosFields, 3,
         backbuffer, &gameState->fontFaceSmall);
     
     // Draw model fields

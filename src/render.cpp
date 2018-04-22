@@ -320,6 +320,7 @@ void RenderTrianglePhong(GameBackbuffer* backbuffer,
     }
 }
 
+// Point sampling
 internal Vec3 SampleBitmap(const Bitmap* bitmap, Vec2 uv)
 {
     int i = ClampInt((int)(uv.x * bitmap->width), 0, bitmap->width - 1);
@@ -373,11 +374,116 @@ void RenderTrianglePhong(GameBackbuffer* backbuffer,
                 }
                 else {
                     normal = Normalize(SampleBitmap(normalMap, uv));
-                    normal *= 1.2f;
                 }
                 Vec3 color = CalculatePhongColor(vert, normal,
                     cameraPos, lightPos, material);
                 SetPixelColor(backbuffer, pix, color);
+            }
+        }
+    }
+}
+
+internal inline BoundingBox ComputeTriangleBoundingBox(Vec2Int triangle[3])
+{
+    BoundingBox bb;
+    bb.min.x = MinInt(MinInt(triangle[0].x, triangle[1].x), triangle[2].x);
+    bb.min.y = MinInt(MinInt(triangle[0].y, triangle[1].y), triangle[2].y);
+    bb.max.x = MaxInt(MaxInt(triangle[0].x, triangle[1].x), triangle[2].x);
+    bb.max.y = MaxInt(MaxInt(triangle[0].y, triangle[1].y), triangle[2].y);
+    return bb;
+}
+internal inline float32 ComputeTriangleSignedArea(
+    Vec2Int v0, Vec2Int v1, Vec2Int v2)
+{
+    return 0.5f * (
+        (v1.x - v0.x) * (v2.y - v0.y)
+        - (v2.x - v0.x) * (v1.y - v0.y));
+}
+internal inline Vec3 ComputeBarycentricCoords(Vec2Int triangle[3], Vec2Int p)
+{
+    Vec3 result;
+    float32 area = ComputeTriangleSignedArea(
+        triangle[0], triangle[1], triangle[2]);
+    result.x = ComputeTriangleSignedArea(triangle[0], triangle[1], p);
+    result.x /= area;
+    result.y = ComputeTriangleSignedArea(triangle[1], triangle[2], p);
+    result.y /= area;
+    result.z = ComputeTriangleSignedArea(triangle[2], triangle[0], p);
+    result.z /= area;
+    return result;
+}
+internal inline uint32 GetPixelDepth(GameBackbuffer* backbuffer, Vec2Int coords)
+{
+    int ind = coords.y * backbuffer->width + coords.x;
+    return backbuffer->depth[ind];
+}
+internal void SetPixelColor(GameBackbuffer* backbuffer,
+    Vec2Int coords, uint32 depth, Vec3 color)
+{
+    DEBUG_ASSERT(0 <= coords.x && coords.x < backbuffer->width);
+    DEBUG_ASSERT(0 <= coords.y && coords.y < backbuffer->height);
+    COLOR_VEC3_TO_UINT8(color, r, g, b);
+
+    uint8* backbufferData = (uint8*)backbuffer->data;
+    uint32* pixel = (uint32*)(backbufferData +
+        coords.y * backbuffer->width * backbuffer->bytesPerPixel
+        + coords.x * backbuffer->bytesPerPixel);
+    *pixel = (r << 16) | (g << 8) | b;
+    int ind = coords.y * backbuffer->width + coords.x;
+    backbuffer->depth[ind] = depth;
+}
+
+void RenderTrianglesPhong(GameBackbuffer* backbuffer,
+    MeshScratch* scratch,
+    Bitmap* diffuseMap, Bitmap* specularMap, Bitmap* normalMap,
+    Vec3 cameraPos, Vec3 lightPos, Material material)
+{
+    for (int t = 0; t < scratch->numTriangles; t++) {
+        PhongTriangle triangle = scratch->triangles[t];
+        BoundingBox bound = ComputeTriangleBoundingBox(
+            triangle.screenPos);
+        bound.min.x = MaxInt(bound.min.x, 0);
+        bound.max.x = MinInt(bound.max.x, backbuffer->width - 1);
+        bound.min.y = MaxInt(bound.min.y, 0);
+        bound.max.y = MinInt(bound.max.y, backbuffer->height - 1);
+        Vec2Int pix;
+        for (pix.x = bound.min.x; pix.x < bound.max.x; pix.x++) {
+            for (pix.y = bound.min.y; pix.y < bound.max.y; pix.y++) {
+                Vec3 bCoords = ComputeBarycentricCoords(
+                    triangle.screenPos, pix);
+                if (0.0f <= bCoords.x && bCoords.x <= 1.0f
+                && 0.0f <= bCoords.y && bCoords.y <= 1.0f
+                && 0.0f <= bCoords.z && bCoords.z <= 1.0f) {
+                    uint32 depth = (uint32)(triangle.depth[2] * bCoords.x
+                        + triangle.depth[0] * bCoords.y
+                        + triangle.depth[1] * bCoords.z);
+                    depth = ClampUInt32(depth, 0, UINT32_MAX);
+                    if (depth < GetPixelDepth(backbuffer, pix)) {
+                        continue;
+                    }
+
+                    Vec3 vert = triangle.pos[2] * bCoords.x
+                        + triangle.pos[0] * bCoords.y
+                        + triangle.pos[1] * bCoords.z;
+                    Vec2 uv = triangle.uv[2] * bCoords.x
+                        + triangle.uv[0] * bCoords.y
+                        + triangle.uv[1] * bCoords.z;
+                    
+                    material.diffuse = SampleBitmap(diffuseMap, uv);
+                    material.specular = SampleBitmap(specularMap, uv);
+                    Vec3 normal;
+                    if (normalMap == nullptr) {
+                        normal = triangle.normal[2] * bCoords.x
+                            + triangle.normal[0] * bCoords.y
+                            + triangle.normal[1] * bCoords.z;
+                    }
+                    else {
+                        normal = Normalize(SampleBitmap(normalMap, uv));
+                    }
+                    Vec3 color = CalculatePhongColor(vert, normal,
+                        cameraPos, lightPos, material);
+                    SetPixelColor(backbuffer, pix, (uint32)depth, color);
+                }
             }
         }
     }

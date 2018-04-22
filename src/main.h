@@ -41,12 +41,14 @@ struct GameState
     ShadeMode shadeMode;
     Vec3 lightPos;
     Material globalMaterial;
+    bool32 backfaceCulling;
 
     FT_Library library;
     FontFace fontFaceSmall;
     FontFace fontFaceMedium;
     FontFace fontFaceLarge;
 
+    // -------------- UI elements ---------------
     Button shadeModeButtons[SHADEMODE_LAST];
 
     InputField ambientFields[3];
@@ -54,10 +56,15 @@ struct GameState
     InputField specularFields[3];
     InputField shininessField;
 
+    InputField lightPosFields[3];
+
+    Button backfaceCullingButton;
+
     Button sampleModeButtons[SAMPLEMODE_LAST];
 
     Button addMeshFieldButton;
     DynamicArray<MeshField> meshFields;
+    // ------------------------------------------
 
     Bitmap ahDiffuseMap;
     Bitmap ahSpecularMap;
