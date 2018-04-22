@@ -1,6 +1,7 @@
-# 315 K
+# Software Rasterizer
 
-NOTE: Linux
+Excuse the writeup HTML, CSS, and JS files tainting this beautiful repository. They were required for the assignment.
+
+NOTE: Linux build
 required packages
-- freeglut3-dev (OpenGL headers)
 - xorg-dev (X11 libraries)
