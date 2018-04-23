@@ -578,17 +578,15 @@ internal void Win32ClearInput(GameInput* input, GameInput* inputPrev)
         input->mouseButtons[i].isDown = inputPrev->mouseButtons[i].isDown;
         input->mouseButtons[i].transitions = 0;
     }
+    input->mousePos = inputPrev->mousePos;
+    input->mouseWheel = inputPrev->mouseWheel;
 
     for (int i = 0; i < KM_KEY_LAST; i++) {
         input->keyboard[i].isDown = inputPrev->keyboard[i].isDown;
         input->keyboard[i].transitions = 0;
     }
-
     input->keyboardString[0] = '\0';
     input->keyboardStringLen = 0;
-
-    input->mousePos = inputPrev->mousePos;
-    input->mouseWheel = inputPrev->mouseWheel;
 }
 
 internal HWND Win32CreateWindow(
