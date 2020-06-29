@@ -6,9 +6,11 @@ import string
 import hashlib
 import random
 
+VCVARSALL_CMD = "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64"
+
 def GetScriptPath():
     path = os.path.realpath(__file__)
-    lastSep = string.rfind(path, os.sep)
+    lastSep = path.rfind(os.sep)
     return path[:lastSep]
 
 def GetLastSlashPath(path):
@@ -17,7 +19,7 @@ def GetLastSlashPath(path):
     (The path of the directory containing the given path.
     This is the equivalent of "path/..", but without the "..")
     """
-    lastSep = string.rfind(path, os.sep)
+    lastSep = path.rfind(os.sep)
     return path[:lastSep]
 
 def NormalizePathSlashes(pathDict):
@@ -26,6 +28,7 @@ def NormalizePathSlashes(pathDict):
 
 # Important directory & file paths
 paths = { "root": GetLastSlashPath(GetScriptPath()) }
+print(paths["root"])
 
 paths["build"]          = paths["root"] + "/build"
 paths["data"]           = paths["root"] + "/data"
@@ -78,7 +81,7 @@ def WinCompileDebug():
         "/wd4505",  # unreferenced local function has been removed
     ])
     includePaths = " ".join([
-        "/I" + paths["include-freetype"]
+        "/I\"" + paths["include-freetype"] + "\""
     ])
 
     linkerFlags = " ".join([
@@ -86,7 +89,7 @@ def WinCompileDebug():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        "/LIBPATH:" + paths["lib-ft-win-d"]
+        "/LIBPATH:\"" + paths["lib-ft-win-d"] + "\""
     ])
     libs = " ".join([
         "user32.lib",
@@ -106,14 +109,14 @@ def WinCompileDebug():
     compileDLLCommand = " ".join([
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/LD", "/Ferasterizer_game.dll", paths["main-cpp"],
+        "/LD", "/Ferasterizer_game.dll", "\"" + paths["main-cpp"] + "\"",
         "/link", linkerFlags, libPaths, libs,
         "/EXPORT:GameUpdateAndRender", "/PDB:" + pdbName])
 
     compileCommand = " ".join([
         "cl", "/DGAME_PLATFORM_CODE",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/Ferasterizer_win32.exe", "/Fmrasterizer_win32.map", paths["win32-main-cpp"],
+        "/Ferasterizer_win32.exe", "/Fmrasterizer_win32.map", "\"" + paths["win32-main-cpp"] + "\"",
         "/link", linkerFlags, libPaths, libs])
     
     devenvCommand = "rem"
@@ -121,11 +124,9 @@ def WinCompileDebug():
         if sys.argv[2] == "devenv":
             devenvCommand = "devenv rasterizer_win32.exe"
 
-    loadCompiler = "call \"C:\\Program Files (x86)" + \
-        "\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" x64"
     os.system(" & ".join([
         "pushd " + paths["build"],
-        loadCompiler,
+        VCVARSALL_CMD,
         compileDLLCommand,
         compileCommand,
         devenvCommand,
@@ -160,7 +161,7 @@ def WinCompileRelease():
         "/wd4505",  # unreferenced local function has been removed
     ])
     includePaths = " ".join([
-        "/I" + paths["include-freetype"]
+        "/I\"" + paths["include-freetype"] + "\""
     ])
 
     linkerFlags = " ".join([
@@ -168,7 +169,7 @@ def WinCompileRelease():
         "/opt:ref"          # get rid of extraneous linkages
     ])
     libPaths = " ".join([
-        "/LIBPATH:" + paths["lib-ft-win-r"]
+        "/LIBPATH:\"" + paths["lib-ft-win-r"] + "\""
     ])
     libs = " ".join([
         "user32.lib",
@@ -188,14 +189,14 @@ def WinCompileRelease():
     compileDLLCommand = " ".join([
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/LD", "/Ferasterizer_game.dll", paths["main-cpp"],
+        "/LD", "/Ferasterizer_game.dll", "\"" + paths["main-cpp"] + "\"",
         "/link", linkerFlags, libPaths, libs,
         "/EXPORT:GameUpdateAndRender", "/PDB:" + pdbName])
 
     compileCommand = " ".join([
         "cl", "/DGAME_PLATFORM_CODE",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/Ferasterizer_win32.exe", "/Fmrasterizer_win32.map", paths["win32-main-cpp"],
+        "/Ferasterizer_win32.exe", "/Fmrasterizer_win32.map", "\"" + paths["win32-main-cpp"] + "\"",
         "/link", linkerFlags, libPaths, libs])
     
     devenvCommand = "rem"
@@ -203,11 +204,9 @@ def WinCompileRelease():
         if sys.argv[2] == "devenv":
             devenvCommand = "devenv rasterizer_win32.exe"
 
-    loadCompiler = "call \"C:\\Program Files (x86)" + \
-        "\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" x64"
     os.system(" & ".join([
         "pushd " + paths["build"],
-        loadCompiler,
+        VCVARSALL_CMD,
         compileDLLCommand,
         compileCommand,
         devenvCommand,
@@ -377,7 +376,7 @@ def Debug():
     elif platformName == "Linux":
         LinuxCompileDebug()
     else:
-        print "Unsupported platform: " + platformName
+        print("Unsupported platform: " + platformName)
         
 
 def IfChanged():
@@ -401,7 +400,7 @@ def IfChanged():
     if changed:
         Debug()
     else:
-        print "No changes. Nothing to compile."
+        print("No changes. Nothing to compile.")
 
 def Release():
     CopyDir(paths["data"], paths["build-data"])
@@ -410,9 +409,9 @@ def Release():
     if platformName == "Windows":
         WinCompileRelease()
     elif platformName == "Linux":
-        print "Release: UNIMPLEMENTED"
+        print("Release: UNIMPLEMENTED")
     else:
-        print "Release: UNIMPLEMENTED"
+        print("Release: UNIMPLEMENTED")
 
 def Clean():
     for fileName in os.listdir(paths["build"]):
@@ -425,7 +424,7 @@ def Clean():
         except Exception as e:
             # Handles file-in-use kinds of things.
             # ... exceptions are so ugly.
-            print e
+            print(e)
 
 def Main():
     if not os.path.exists(paths["build"]):
